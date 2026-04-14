@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user preferences and check-in data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "birthDate": { "type": "string" },
+        "birthTime": { "type": "string" },
+        "isTrueSolarTime": { "type": "boolean" },
+        "checkInDates": { "type": "array", "items": { "type": "string" } },
+        "checkInStreak": { "type": "integer" },
+        "isSubscribed": { "type": "boolean" },
+        "profile": {
+          "type": "object",
+          "properties": {
+            "interests": { "type": "object" },
+            "lastDivination": { "type": "string", "format": "date-time" },
+            "luckScore": { "type": "integer" },
+            "divinationCount": { "type": "integer" }
+          }
+        }
+      },
+      "required": ["uid", "name"]
+    },
+    "Post": {
+      "title": "Community Post",
+      "description": "A post shared in the healing community",
+      "type": "object",
+      "properties": {
+        "author": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "likes": { "type": "integer" },
+        "likedBy": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string", "enum": ["fortune", "healing", "chart"] }
+      },
+      "required": ["author", "authorUid", "content", "createdAt", "type"]
+    },
+    "QA": {
+      "title": "Q&A Session",
+      "description": "A question asked by a user and the AI response",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userUid", "question", "createdAt"]
+    },
+    "Comment": {
+      "title": "Post Comment",
+      "description": "A comment on a community post",
+      "type": "object",
+      "properties": {
+        "author": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["author", "authorUid", "content", "createdAt"]
+    },
+    "DivinationHistory": {
+      "title": "Divination History",
+      "description": "History of user divination results",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "option": { "type": "string" },
+        "question": { "type": "string" },
+        "result": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["category", "option", "question", "result", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles and private data"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Public community posts"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on a specific post"
+    },
+    "/users/{userId}/qa/{qaId}": {
+      "schema": "QA",
+      "description": "Private Q&A history for a user"
+    },
+    "/users/{userId}/divination_history/{historyId}": {
+      "schema": "DivinationHistory",
+      "description": "Private divination history for a user"
+    }
+  }
+}

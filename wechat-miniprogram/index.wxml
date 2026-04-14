@@ -1,0 +1,352 @@
+<view class="container">
+  <view class="fixed-bg">
+    <view class="blob blob-1"></view>
+    <view class="blob blob-2"></view>
+    <view class="blob blob-3"></view>
+  </view>
+
+  <view class="main">
+    <!-- Report Section -->
+    <block wx:if="{{mainTab === 'report'}}">
+      <block wx:if="{{!result}}">
+        <view class="header">
+          <view class="icon-box">✨</view>
+          <text class="title">测测·治愈空间</text>
+          <text class="subtitle">用命理读懂自己，用陪伴治愈日常</text>
+        </view>
+
+        <view class="card form-card">
+          <view class="form-item">
+            <view class="label">你的称呼</view>
+            <view class="input-wrapper">
+              <text class="input-icon">👤</text>
+              <input class="input" placeholder="如何称呼你？" bindinput="onNameInput" value="{{name}}" />
+            </view>
+          </view>
+
+          <view class="form-item">
+            <view class="label">性别选择</view>
+            <view class="gender-box">
+              <view class="gender-btn {{gender === 'female' ? 'active' : ''}}" bindtap="setGender" data-gender="female">女生</view>
+              <view class="gender-btn {{gender === 'male' ? 'active' : ''}}" bindtap="setGender" data-gender="male">男生</view>
+            </view>
+          </view>
+
+          <view class="row">
+            <view class="form-item flex-1 mr-20">
+              <view class="label">出生日期</view>
+              <view class="input-wrapper">
+                <text class="input-icon">📅</text>
+                <picker mode="date" value="{{birthDate}}" bindchange="onDateChange">
+                  <view class="input small">{{birthDate || '选择日期'}}</view>
+                </picker>
+              </view>
+            </view>
+            <view class="form-item flex-1">
+              <view class="label">出生时辰</view>
+              <view class="input-wrapper">
+                <text class="input-icon">⏰</text>
+                <picker mode="time" value="{{birthTime}}" bindchange="onTimeChange">
+                  <view class="input small">{{birthTime || '选择时间'}}</view>
+                </picker>
+              </view>
+            </view>
+          </view>
+
+          <view class="solar-toggle" bindtap="toggleSolarTime">
+            <text class="toggle-label">采用真太阳时校准</text>
+            <view class="toggle-switch {{isTrueSolarTime ? 'active' : ''}}">
+              <view class="toggle-dot"></view>
+            </view>
+          </view>
+
+          <button class="submit-btn" bindtap="onSubmit" loading="{{loading}}">
+            {{loading ? '正在连接星辰...' : '开启我的治愈报告'}}
+          </button>
+        </view>
+        
+        <view class="footer-disclaimer">
+          <text>⚠️ 仅供娱乐参考，请保持理性心态</text>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view class="result-header sticky">
+          <view class="top-bar">
+            <view class="back-btn" bindtap="onReset">↺</view>
+            <text class="page-title">我的治愈报告</text>
+            <view class="avatar">{{name[0]}}</view>
+          </view>
+          <view class="tabs">
+            <view class="tab {{activeTab === 'overview' ? 'active' : ''}}" bindtap="switchTab" data-tab="overview">性格解析</view>
+            <view class="tab {{activeTab === 'fortune' ? 'active' : ''}}" bindtap="switchTab" data-tab="fortune">今日运势</view>
+            <view class="tab {{activeTab === 'lucky' ? 'active' : ''}}" bindtap="switchTab" data-tab="lucky">开运指南</view>
+          </view>
+        </view>
+
+        <view class="result-content">
+          <!-- Overview Tab -->
+          <view wx:if="{{activeTab === 'overview'}}" class="tab-content">
+            <view class="card summary-card">
+              <view class="summary-label">核心特质</view>
+              <view class="summary-text">{{result.summary}}</view>
+              <view class="summary-score">
+                <text class="score-num">{{result.scores.overall}}</text>
+                <text class="score-unit">综合契合度</text>
+              </view>
+            </view>
+
+            <view class="fortune-grid">
+              <view class="fortune-item love" bindtap="switchTab" data-tab="fortune">
+                <view class="fortune-top">
+                  <view class="fortune-icon">❤️</view>
+                  <text class="fortune-score">{{result.scores.love}}</text>
+                </view>
+                <text class="fortune-label">爱情</text>
+              </view>
+              <view class="fortune-item career" bindtap="switchTab" data-tab="fortune">
+                <view class="fortune-top">
+                  <view class="fortune-icon">💼</view>
+                  <text class="fortune-score">{{result.scores.career}}</text>
+                </view>
+                <text class="fortune-label">事业</text>
+              </view>
+              <view class="fortune-item wealth" bindtap="switchTab" data-tab="fortune">
+                <view class="fortune-top">
+                  <view class="fortune-icon">💰</view>
+                  <text class="fortune-score">{{result.scores.wealth}}</text>
+                </view>
+                <text class="fortune-label">财富</text>
+              </view>
+              <view class="fortune-item health" bindtap="switchTab" data-tab="fortune">
+                <view class="fortune-top">
+                  <view class="fortune-icon">💪</view>
+                  <text class="fortune-score">{{result.scores.health}}</text>
+                </view>
+                <text class="fortune-label">健康</text>
+              </view>
+            </view>
+
+            <view class="card bazi-card">
+              <view class="section-header">⭐ 先天命盘解读</view>
+              <view class="bazi-list">
+                <view class="bazi-row" wx:for="{{result.bazi}}" wx:key="label">
+                  <view class="bazi-col-left">
+                    <text class="bazi-label">{{item.label}}</text>
+                    <text class="bazi-val">{{item.stem}}{{item.branch}}</text>
+                  </view>
+                  <view class="bazi-col-right">
+                    <text class="bazi-desc-title">{{item.desc}}</text>
+                    <text class="bazi-vernacular">{{item.vernacular}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+
+            <view class="card text-card">
+              <view class="section-header">❤️ 深度性格解析</view>
+              <text class="content-text">{{result.personality}}</text>
+            </view>
+          </view>
+
+          <!-- Fortune Tab -->
+          <view wx:if="{{activeTab === 'fortune'}}" class="tab-content">
+            <scroll-view scroll-x class="sub-tabs" enable-flex>
+              <view class="sub-tab {{activeSubTab === 'love' ? 'active' : ''}}" bindtap="switchSubTab" data-sub="love">
+                <text class="sub-icon">❤️</text> 爱情
+              </view>
+              <view class="sub-tab {{activeSubTab === 'career' ? 'active' : ''}}" bindtap="switchSubTab" data-sub="career">
+                <text class="sub-icon">💼</text> 事业
+              </view>
+              <view class="sub-tab {{activeSubTab === 'wealth' ? 'active' : ''}}" bindtap="switchSubTab" data-sub="wealth">
+                <text class="sub-icon">💰</text> 财富
+              </view>
+              <view class="sub-tab {{activeSubTab === 'health' ? 'active' : ''}}" bindtap="switchSubTab" data-sub="health">
+                <text class="sub-icon">💪</text> 健康
+              </view>
+            </scroll-view>
+
+            <view class="card detail-score-card">
+              <view class="detail-score-header">{{activeSubTab === 'love' ? 'Love' : activeSubTab === 'career' ? 'Career' : activeSubTab === 'wealth' ? 'Wealth' : 'Health'}} Index</view>
+              <view class="detail-score-val {{activeSubTab}}">
+                {{activeSubTab === 'love' ? result.scores.love : 
+                  activeSubTab === 'career' ? result.scores.career : 
+                  activeSubTab === 'wealth' ? result.scores.wealth : result.scores.health}}
+              </view>
+              <view class="mood-tag">
+                <text class="mood-label">今日情绪</text>
+                <text class="mood-val">{{result.lucky.mood}}</text>
+              </view>
+            </view>
+
+            <view class="card text-card">
+              <view class="section-header">💡 具体分析与建议</view>
+              <view class="bullet-list">
+                <view class="bullet-item" wx:for="{{result.lucky.details[activeSubTab]}}" wx:key="*this">
+                  <view class="bullet-dot"></view>
+                  <text class="bullet-text">{{item}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="card quote-card">
+              <view class="quote-header">今日治愈语录</view>
+              <view class="quote-text">" {{result.lucky.advice}} "</view>
+              <view class="quote-footer">— {{result.lucky.moodAdvice}}</view>
+            </view>
+          </view>
+
+          <!-- Lucky Tab -->
+          <view wx:if="{{activeTab === 'lucky'}}" class="tab-content">
+            <view class="lucky-list">
+              <view class="card lucky-item-card" wx:for="{{[{label: '幸运颜色', val: result.lucky.color, icon: '🎨', color: 'purple', desc: result.lucky.luckyGuide.colorDesc, usage: '日常穿搭/桌面布置可多用，提升气场'}, {label: '开运饰品', val: result.lucky.item, icon: '💎', color: 'pink', desc: result.lucky.luckyGuide.itemDesc, usage: '随身佩戴或放置于包中，稳固能量'}, {label: '贵人方位', val: result.lucky.direction, icon: '🧭', color: 'blue', desc: result.lucky.luckyGuide.directionDesc, usage: '办公或冥想时面向此方位，获得助力'}, {label: '开运饮食', val: result.lucky.food, icon: '🍲', color: 'orange', desc: result.lucky.luckyGuide.foodDesc, usage: '今日适量摄入，调理五行平衡'}]}}" wx:key="label">
+                <view class="lucky-top">
+                  <view class="lucky-icon-box {{item.color}}">{{item.icon}}</view>
+                  <view class="lucky-title-box">
+                    <text class="lucky-label">{{item.label}}</text>
+                    <text class="lucky-val">{{item.val}}</text>
+                  </view>
+                </view>
+                <view class="lucky-usage">
+                  <text class="usage-label">使用说明</text>
+                  <text class="usage-text">{{item.usage}}</text>
+                </view>
+                <text class="lucky-desc-text">{{item.desc}}</text>
+              </view>
+
+              <view class="card task-card">
+                <view class="section-header">✨ 今日开运小任务</view>
+                <view class="task-box">
+                  <view class="task-check">
+                    <view class="check-inner"></view>
+                  </view>
+                  <text class="task-text">{{result.lucky.task}}</text>
+                </view>
+                <text class="task-basis">命理依据：{{result.lucky.basis}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+    </block>
+
+    <!-- Community Section -->
+    <block wx:if="{{mainTab === 'community'}}">
+      <view class="section-header-main">
+        <text class="title">轻社区</text>
+        <text class="subtitle">分享治愈瞬间，遇见同好</text>
+      </view>
+      
+      <view class="card post-input-card">
+        <textarea class="post-textarea" placeholder="分享你的今日运势或治愈瞬间..." bindinput="onPostInput" value="{{newPostContent}}"></textarea>
+        <view class="post-actions">
+          <view class="post-icon-btn">📷</view>
+          <button class="post-btn" bindtap="handlePost">发布</button>
+        </view>
+      </view>
+
+      <view class="posts-list">
+        <view class="card post-card" wx:for="{{posts}}" wx:key="id">
+          <view class="post-header">
+            <view class="post-avatar">{{item.author[0]}}</view>
+            <view class="post-info">
+              <text class="post-author">{{item.author}}</text>
+              <text class="post-time">{{item.time}}</text>
+            </view>
+          </view>
+          <text class="post-content">{{item.content}}</text>
+          <view class="post-footer">
+            <view class="post-action" bindtap="handleLike" data-id="{{item.id}}">
+              <text class="action-icon {{item.likes > 0 ? 'active' : ''}}">❤️</text>
+              <text class="action-count">{{item.likes}}</text>
+            </view>
+            <view class="post-action">
+              <text class="action-icon">💬</text>
+              <text class="action-count">评论</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- Check-in Section -->
+    <block wx:if="{{mainTab === 'checkin'}}">
+      <view class="section-header-main">
+        <text class="title">运势打卡</text>
+        <text class="subtitle">记录每日能量，见证成长</text>
+      </view>
+
+      <view class="card streak-card">
+        <view class="streak-info">
+          <text class="streak-label">已连续打卡</text>
+          <view class="streak-val-box">
+            <text class="streak-num">{{checkInStreak}}</text>
+            <text class="streak-unit">天</text>
+          </view>
+        </view>
+        <button class="checkin-btn" bindtap="handleCheckIn">立即打卡</button>
+      </view>
+
+      <view class="card calendar-card">
+        <view class="calendar-header">能量日历</view>
+        <view class="calendar-grid">
+          <view class="calendar-day {{checkInDates.length > index ? 'active' : ''}}" wx:for="{{30}}" wx:key="*this">
+            <text class="day-num">{{index + 1}}</text>
+            <view class="day-dot" wx:if="{{index < 5}}"></view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- Q&A Section -->
+    <block wx:if="{{mainTab === 'qa'}}">
+      <view class="section-header-main">
+        <text class="title">问答社区</text>
+        <text class="subtitle">专业命理师为你答疑解惑</text>
+      </view>
+
+      <view class="card qa-input-card">
+        <textarea class="qa-textarea" placeholder="输入你想咨询的命理问题..." bindinput="onQuestionInput" value="{{question}}"></textarea>
+        <button class="qa-btn" bindtap="handleAsk" loading="{{isAsking}}">提问</button>
+      </view>
+
+      <view class="qa-list">
+        <view class="card qa-card" wx:for="{{qaList}}" wx:key="id">
+          <view class="qa-q">
+            <text class="qa-tag q">问</text>
+            <text class="qa-text">{{item.question}}</text>
+          </view>
+          <view class="qa-a">
+            <text class="qa-tag a">答</text>
+            <view class="qa-answer-box">
+              <text wx:if="{{!item.loading}}" class="qa-text">{{item.answer}}</text>
+              <view wx:else class="loading-dots">
+                <view class="dot"></view><view class="dot"></view><view class="dot"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- Bottom Navigation -->
+  <view class="bottom-nav">
+    <view class="nav-item {{mainTab === 'report' ? 'active' : ''}}" bindtap="switchMainTab" data-tab="report">
+      <text class="nav-icon">📊</text>
+      <text class="nav-label">报告</text>
+    </view>
+    <view class="nav-item {{mainTab === 'community' ? 'active' : ''}}" bindtap="switchMainTab" data-tab="community">
+      <text class="nav-icon">💬</text>
+      <text class="nav-label">社区</text>
+    </view>
+    <view class="nav-item {{mainTab === 'checkin' ? 'active' : ''}}" bindtap="switchMainTab" data-tab="checkin">
+      <text class="nav-icon">📅</text>
+      <text class="nav-label">打卡</text>
+    </view>
+    <view class="nav-item {{mainTab === 'qa' ? 'active' : ''}}" bindtap="switchMainTab" data-tab="qa">
+      <text class="nav-icon">❓</text>
+      <text class="nav-label">问答</text>
+    </view>
+  </view>
+</view>
