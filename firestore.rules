@@ -89,12 +89,14 @@ service cloud.firestore {
     }
 
     function isValidDivinationHistory(data) {
-      return data.keys().hasAll(['category', 'option', 'question', 'result', 'timestamp']) &&
+      return data.keys().hasAll(['category', 'question', 'result', 'timestamp']) &&
              data.category is string &&
-             data.option is string &&
+             (!('option' in data) || data.option == null || data.option is string) &&
              data.question is string &&
              data.result is map &&
-             data.timestamp is timestamp;
+             data.timestamp is timestamp &&
+             (!('type' in data) || data.type is string) &&
+             (!('ichingYao' in data) || data.ichingYao == null || data.ichingYao is list);
     }
 
     // ===============================================================
