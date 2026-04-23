@@ -3,14 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toPng } from 'html-to-image';
+import confetti from 'canvas-confetti';
 import { 
   Sparkles, Calendar, Clock, User, ChevronRight, 
   Info, Heart, Star, Moon, Briefcase, Wallet, Activity, 
   Palette, Gem, Compass, Utensils, Lightbulb, MessageSquare,
-  Share2, CheckCircle2, Send, Plus, Image as ImageIcon,
-  MessageCircle, HelpCircle, Trophy, Dices, Zap,
+  Share2, CheckCircle2, Send, Plus, Image as ImageIcon, Download, 
+  MessageCircle, HelpCircle, Trophy, Dices, Zap, Camera,
   Volume2, VolumeX, Mic, User2, Users2, Info as InfoIcon,
   ChevronLeft, History, LayoutGrid, ArrowLeft, RefreshCw,
   AlertCircle, Gift, TrendingUp, Trash2
@@ -63,7 +65,15 @@ interface Post {
   type: 'fortune' | 'healing' | 'chart' | 'divination_help';
   image?: string;
   divinationData?: any;
+  mood?: string;
 }
+
+const MOODS = [
+  { id: 'enlightened', label: '豁然开朗', emoji: '💛' },
+  { id: 'low', label: '有些低落', emoji: '💧' },
+  { id: 'night', label: '深夜感慨', emoji: '🌙' },
+  { id: 'slow', label: '慢慢来', emoji: '🌱' }
+];
 
 interface Comment {
   id: string;
@@ -80,6 +90,100 @@ interface QA {
   answer?: string;
   loading?: boolean;
 }
+
+const GrowthPlant = ({ streak, checkedInToday }: { streak: number; checkedInToday: boolean }) => {
+  const isWithered = !checkedInToday && streak > 0;
+  
+  // Stages: 1, 3, 7, 14, 21
+  let stage = 0;
+  if (streak >= 21) stage = 5;
+  else if (streak >= 14) stage = 4;
+  else if (streak >= 7) stage = 3;
+  else if (streak >= 3) stage = 2;
+  else if (streak >= 1) stage = 1;
+
+  const plantColor = isWithered ? '#A09070' : '#457B52';
+  const leafColor = isWithered ? '#8A7A5A' : '#6A994E';
+  const flowerColor = isWithered ? '#D1B0B0' : '#B52F25';
+
+  return (
+    <div className="relative w-48 h-48 mx-auto mb-4 flex items-end justify-center">
+      <div className="absolute bottom-4 w-24 h-6 bg-[#634832]/20 rounded-full blur-sm" />
+      <div className="absolute bottom-4 w-16 h-3 bg-[#4B3022] rounded-full" />
+      
+      <AnimatePresence mode="wait">
+        <motion.div
+           key={stage + (isWithered ? '-withered' : '-healthy')}
+           initial={{ opacity: 0, scale: 0.8, y: 10 }}
+           animate={{ opacity: 1, scale: 1, y: 0 }}
+           exit={{ opacity: 0, scale: 0.8, y: 5 }}
+           transition={{ duration: 0.5 }}
+           className="relative z-10"
+        >
+          {stage === 0 && (
+             <div className="w-1 h-1 bg-[#4B3022] rounded-full mb-1" />
+          )}
+
+          {stage >= 1 && (
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none" className="drop-shadow-sm">
+              <motion.path 
+                d={stage >= 3 ? "M60 110 Q60 60 60 40" : "M60 110 Q60 90 60 85"} 
+                stroke={plantColor} 
+                strokeWidth="4" 
+                strokeLinecap="round" 
+              />
+              {stage === 1 && (
+                <path d="M60 85 C55 80 50 82 48 88 M60 85 C65 80 70 82 72 88" stroke={leafColor} strokeWidth="3" strokeLinecap="round" />
+              )}
+              {stage >= 2 && (
+                <>
+                  <path d="M60 90 C50 80 40 85 35 95" stroke={leafColor} strokeWidth="3" strokeLinecap="round" />
+                  <path d="M60 90 C70 80 80 85 85 95" stroke={leafColor} strokeWidth="3" strokeLinecap="round" />
+                </>
+              )}
+              {stage >= 3 && (
+                <>
+                  <path d="M60 70 C45 60 35 65 30 75" stroke={leafColor} strokeWidth="3" strokeLinecap="round" />
+                  <path d="M60 70 C75 60 85 65 90 75" stroke={leafColor} strokeWidth="3" strokeLinecap="round" />
+                </>
+              )}
+              {stage === 4 && (
+                <motion.circle 
+                  cx="60" cy="40" r="6" 
+                  fill={flowerColor} 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                />
+              )}
+              {stage === 5 && (
+                <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                  <circle cx="60" cy="40" r="6" fill="#F0C05A" />
+                  {[0, 60, 120, 180, 240, 300].map((angle, i) => (
+                    <circle 
+                      key={i}
+                      cx={60 + 12 * Math.cos(angle * Math.PI / 180)} 
+                      cy={40 + 12 * Math.sin(angle * Math.PI / 180)} 
+                      r="8" 
+                      fill={flowerColor} 
+                    />
+                  ))}
+                </motion.g>
+              )}
+            </svg>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {!isWithered && stage >= 2 && (
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ repeat: Infinity, duration: 3 }}
+          className="absolute top-10 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full bg-guofeng-red/5 blur-2xl -z-10" 
+        />
+      )}
+    </div>
+  );
+};
 
 const DIVINATION_CATEGORIES = [
   { 
@@ -297,6 +401,7 @@ export default function App() {
   // Community State
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
+  const [selectedMood, setSelectedMood] = useState('enlightened');
   const [expandedPostComments, setExpandedPostComments] = useState<string | null>(null);
   const [commentsMap, setCommentsMap] = useState<Record<string, Comment[]>>({});
   const [newCommentContent, setNewCommentContent] = useState('');
@@ -337,6 +442,9 @@ export default function App() {
   const [reportData, setReportData] = useState<any>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showWallpaperModal, setShowWallpaperModal] = useState(false);
+  const [generatingWallpaper, setGeneratingWallpaper] = useState(false);
+  const wallpaperRef = useRef<HTMLDivElement>(null);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -512,6 +620,9 @@ export default function App() {
       console.error("Login Error:", error);
       if (error.code === 'auth/popup-blocked') {
         setAuthError("登录窗口被浏览器拦截，请允许弹出窗口后重试。");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, don't show a scary error
+        setAuthError(null);
       } else if (error.code === 'auth/cancelled-popup-request') {
         // Ignore
       } else if (error.message?.includes('INTERNAL ASSERTION FAILED')) {
@@ -643,9 +754,11 @@ export default function App() {
         createdAt: serverTimestamp(),
         likes: 0,
         likedBy: [],
-        type: 'healing'
+        type: 'healing',
+        mood: selectedMood
       });
       setNewPostContent('');
+      setSelectedMood('enlightened');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'posts');
     }
@@ -779,6 +892,35 @@ ${divinationResult.advice}
       }
     } catch (error) {
       console.error("Share Divination Error:", error);
+    }
+  };
+
+  const handleDownloadWallpaper = async () => {
+    if (!wallpaperRef.current) return;
+    setGeneratingWallpaper(true);
+    try {
+      const dataUrl = await toPng(wallpaperRef.current, { cacheBust: true, quality: 1.0 });
+      const link = document.createElement('a');
+      link.download = `窥探天机-${divinationResult.title}-${new Date().toLocaleDateString()}.png`;
+      link.href = dataUrl;
+      link.click();
+      
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#B52F25', '#C0A46B', '#F5F1E6']
+      });
+
+      // Automatically return to the result screen after a short delay to allow the user to see the success
+      setTimeout(() => {
+        setShowWallpaperModal(false);
+      }, 1000);
+    } catch (err) {
+      console.error('Wallpaper Generation Failed:', err);
+      alert('壁纸生成失败，请重试');
+    } finally {
+      setGeneratingWallpaper(false);
     }
   };
 
@@ -1117,14 +1259,43 @@ ${divinationResult.advice}
   };
 
   return (
-    <div className="min-h-screen bg-guofeng-bg font-sans text-guofeng-ink selection:bg-red-100">
-      {/* Background Decorations */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-40">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-red-100/40 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 -right-24 w-80 h-80 bg-orange-100/40 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-yellow-100/30 rounded-full blur-3xl"></div>
-        {/* Ink Wash Effect Placeholder */}
-        <div className="absolute top-0 right-0 w-full h-64 bg-gradient-to-b from-white/20 to-transparent"></div>
+    <div className="min-h-screen bg-guofeng-bg font-sans text-guofeng-ink selection:bg-red-100 relative">
+      {/* Background Patterns Layer 1: Textured Paper */}
+      <div className="fixed inset-0 pointer-events-none guofeng-paper-texture opacity-40"></div>
+
+      {/* Background Patterns Layer 2: Fret Pattern (Hui-wen) */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03] guofeng-fret-pattern animate-drift-slow"></div>
+
+      {/* Background Patterns Layer 3: Cloud Pattern */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.05] guofeng-cloud-pattern animate-float-cloud" style={{ animationDuration: '40s' }}></div>
+      
+      {/* Background Patterns Layer 4: Ink Wash Effect */}
+      <div className="fixed inset-0 pointer-events-none guofeng-ink-spots opacity-40 animate-ink-pulse"></div>
+
+      {/* Auspicious Clouds Decor (Foregrounded decorative elements) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <svg className="absolute -top-10 -left-10 w-64 h-64 text-guofeng-red/10 animate-float-cloud" viewBox="0 0 100 100" style={{ animationDuration: '15s' }}>
+          <path d="M10 50 Q 25 30 40 50 T 70 50 T 100 50" fill="none" stroke="currentColor" strokeWidth="0.2" />
+          <path d="M20 60 Q 35 40 50 60 T 80 60" fill="none" stroke="currentColor" strokeWidth="0.2" />
+          <circle cx="45" cy="40" r="1" fill="currentColor" />
+        </svg>
+        <svg className="absolute bottom-1/4 -right-16 w-80 h-80 text-guofeng-gold/10 animate-float-cloud" viewBox="0 0 100 100" style={{ transform: 'rotate(180deg)', animationDelay: '-7s', animationDuration: '25s' }}>
+          <path d="M10 50 Q 25 30 40 50 T 70 50 T 100 50" fill="none" stroke="currentColor" strokeWidth="0.2" />
+        </svg>
+      </div>
+
+      {/* Dynamic Ink Drifts */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden mix-blend-multiply opacity-20">
+        <motion.div 
+          animate={{ x: [0, 50, 0], y: [0, -30, 0], rotate: [0, 5, 0] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[10%] left-[5%] w-[600px] h-[600px] bg-gradient-radial from-guofeng-cyan/20 to-transparent blur-3xl"
+        />
+        <motion.div 
+          animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[10%] right-[5%] w-[500px] h-[500px] bg-gradient-radial from-guofeng-gold/10 to-transparent blur-3xl"
+        />
       </div>
 
       <AnimatePresence>
@@ -1166,8 +1337,9 @@ ${divinationResult.advice}
 
       <main className="relative z-10 max-w-md mx-auto min-h-screen flex flex-col">
         {(!result && !isGuest) || showLandingForm ? (
-          <div className="flex-1 px-6 pt-16 pb-20">
-            <header className="text-center mb-12">
+          <div className="flex-1 px-6 pt-16 pb-32">
+            <header className="text-center mb-12 relative">
+              <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-guofeng-gold/20 to-transparent -translate-y-1/2 -z-10"></div>
               {showLandingForm && (
                 <button 
                   onClick={() => setShowLandingForm(false)}
@@ -1179,13 +1351,22 @@ ${divinationResult.advice}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="inline-block p-4 bg-white rounded-full shadow-xl shadow-red-900/5 mb-6 border border-[#F0E6D2]"
+                className="inline-block p-4 bg-white rounded-full shadow-xl shadow-red-900/5 mb-6 border border-[#F0E6D2] relative"
               >
-                <div className="w-12 h-12 bg-guofeng-red rounded-full flex items-center justify-center">
+                <div className="absolute inset-0 border border-guofeng-red/10 rounded-full scale-110"></div>
+                <div className="w-12 h-12 bg-guofeng-red rounded-full flex items-center justify-center relative">
+                  <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-ping opacity-20"></div>
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
               </motion.div>
-              <h1 className="text-4xl font-serif font-black text-guofeng-ink tracking-tight mb-2">窥探天机</h1>
+              <h1 className="text-4xl font-serif font-black text-guofeng-ink tracking-tight mb-2 flex items-center justify-center">
+                <span className="opacity-20 mr-4 text-guofeng-red writing-mode-vertical text-sm font-black tracking-widest leading-none hidden sm:block border-r border-guofeng-red/10 pr-2">天机不可泄露</span>
+                <span className="relative">
+                  窥探天机
+                  <div className="absolute -bottom-2 left-0 w-full h-1 bg-guofeng-red/10 rounded-full guofeng-ink-wash"></div>
+                </span>
+                <span className="opacity-20 ml-4 text-guofeng-red writing-mode-vertical text-sm font-black tracking-widest leading-none hidden sm:block border-l border-guofeng-red/10 pl-2">所求皆有所应</span>
+              </h1>
               <div className="flex items-center justify-center space-x-2">
                 <div className="h-[1px] w-8 bg-guofeng-gold/30"></div>
                 <p className="text-guofeng-red font-serif font-medium text-sm tracking-[0.2em]">
@@ -1224,9 +1405,10 @@ ${divinationResult.advice}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="guofeng-card p-8 relative"
+              className="guofeng-card p-8 relative guofeng-border-hui shadow-2xl"
             >
-              <div className="absolute top-4 right-4 opacity-10">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-guofeng-gold/30 to-transparent"></div>
+              <div className="absolute bottom-0 right-0 opacity-10 pointer-events-none">
                 <Moon size={48} className="text-guofeng-red" />
               </div>
               
@@ -1309,42 +1491,45 @@ ${divinationResult.advice}
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 guofeng-button text-lg font-serif tracking-widest flex items-center justify-center disabled:opacity-50"
+                  className="w-full py-5 guofeng-button text-lg font-serif tracking-[0.4em] flex items-center justify-center disabled:opacity-50 relative overflow-hidden group"
                 >
+                  <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12"></div>
                   {loading ? (
                     <div className="flex items-center space-x-3">
                       <RefreshCw className="w-6 h-6 animate-spin" />
                       <span>正在窥探天机...</span>
                     </div>
                   ) : (
-                    <>开启探测 <ChevronRight className="w-5 h-5 ml-1" /></>
+                    <>开启探测</>
                   )}
                 </button>
               </form>
             </motion.div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col pb-24">
-            {/* Result Header */}
-            <div className="bg-white/90 backdrop-blur-md px-6 pt-12 pb-0 shadow-sm sticky top-0 z-20 border-b border-[#EAE3D5]">
-              {/* Tabs */}
-              <div className="flex justify-around">
-                {(['fortune', 'lucky', 'overview'] as Tab[]).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`pb-4 text-sm font-serif font-bold transition-all relative ${
-                      activeTab === tab ? 'text-guofeng-red' : 'text-guofeng-ink/40'
-                    }`}
-                  >
-                    {tab === 'fortune' ? '今日运势' : tab === 'lucky' ? '开运指南' : '性格解析'}
-                    {activeTab === tab && (
-                      <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-guofeng-red rounded-full" />
-                    )}
-                  </button>
-                ))}
+          <div className="flex-1 flex flex-col pb-24 h-screen overflow-hidden">
+            {/* Result Header - Fixed at top, only for report column */}
+            {mainTab === 'report' && (
+              <div className="bg-white/90 backdrop-blur-md px-6 pt-12 pb-0 shadow-sm z-20 border-b border-[#EAE3D5] shrink-0">
+                {/* Tabs */}
+                <div className="flex justify-around">
+                  {(['fortune', 'lucky', 'overview'] as Tab[]).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`pb-4 text-sm font-serif font-bold transition-all relative ${
+                        activeTab === tab ? 'text-guofeng-red' : 'text-guofeng-ink/40'
+                      }`}
+                    >
+                      {tab === 'fortune' ? '今日运势' : tab === 'lucky' ? '开运指南' : '性格解析'}
+                      {activeTab === tab && (
+                        <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-guofeng-red rounded-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 no-scrollbar pb-32">
               <AnimatePresence mode="wait">
@@ -1379,24 +1564,36 @@ ${divinationResult.advice}
                         ) : (
                           <React.Fragment>
                             {/* Core Trait Summary */}
-                            <div className="guofeng-card p-10 text-center relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-full h-1 bg-guofeng-red"></div>
-                          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-50/50 rounded-full blur-2xl"></div>
-                          <div className="relative z-10">
-                            <div className="text-[10px] font-serif font-bold text-guofeng-red uppercase tracking-[0.3em] mb-6">核心特质 · Core Trait</div>
-                            <p className="text-xl font-serif font-black leading-relaxed text-guofeng-ink mb-8">
-                              {result.summary}
-                            </p>
-                            <div className="flex items-center justify-center space-x-3">
-                              <div className="h-[1px] w-8 bg-guofeng-gold/30"></div>
-                              <div className="flex items-baseline space-x-2">
-                                <span className="text-5xl font-serif font-black text-guofeng-red">{result.scores.overall}</span>
-                                <span className="text-xs font-serif text-guofeng-ink/40">契合度</span>
+                            <div className="guofeng-card p-10 text-center relative overflow-hidden guofeng-border-hui shadow-2xl">
+                              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-guofeng-red/30 to-transparent"></div>
+                              <div className="absolute top-0 left-0 w-1 h-full bg-guofeng-red/5"></div>
+                              <div className="absolute top-0 right-0 w-1 h-full bg-guofeng-red/5"></div>
+                              <div className="absolute -top-10 -right-10 w-40 h-40 bg-guofeng-red/5 rounded-full blur-2xl"></div>
+                              <div className="relative z-10 flex flex-col items-center">
+                                <div className="guofeng-stamp-complex absolute -top-8 -right-8 scale-75 opacity-40 rotate-12 z-20">命格</div>
+                                <div className="text-[10px] font-serif font-bold text-guofeng-red uppercase tracking-[0.4em] mb-8 guofeng-brush-border">核心特质 · The Essence</div>
+                                <div className="text-sm font-serif font-black leading-[2.2] text-guofeng-ink mb-10 border-l-4 border-guofeng-red/30 pl-8 pr-4 py-4 italic max-w-[300px] text-left bg-white/30 rounded-r-2xl">
+                                  {result.summary}
+                                </div>
+                                <div className="guofeng-divider-ornate w-full opacity-60"></div>
+                                <div className="flex items-center justify-center space-x-4 pt-4">
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[8px] font-serif font-bold text-guofeng-ink/30 uppercase tracking-[0.2em] mb-1">Soul Sync</span>
+                                    <div className="h-[1px] w-8 bg-guofeng-gold/30"></div>
+                                  </div>
+                                  <div className="flex items-baseline space-x-2">
+                                    <span className="text-6xl font-serif font-black text-guofeng-red guofeng-hollow-text">
+                                      {result.scores.overall}
+                                    </span>
+                                    <span className="text-xs font-serif font-black text-guofeng-ink tracking-widest">%</span>
+                                  </div>
+                                  <div className="flex flex-col items-start">
+                                    <span className="text-[10px] font-serif font-black text-guofeng-ink tracking-widest mb-1 underline decoration-guofeng-gold/30 underline-offset-4">契合度</span>
+                                    <div className="h-[1px] w-8 bg-guofeng-gold/30"></div>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="h-[1px] w-8 bg-guofeng-gold/30"></div>
                             </div>
-                          </div>
-                        </div>
 
                         {/* Core Trait Radar Chart */}
                         <div className="guofeng-card p-8">
@@ -1445,31 +1642,36 @@ ${divinationResult.advice}
                         </div>
 
                         {/* BaZi Board with Vernacular */}
-                        <div className="guofeng-card p-8">
+                        <div className="guofeng-card p-8 border-guofeng-gold/30">
                           <div className="flex items-center mb-8 space-x-3">
-                            <div className="p-2 bg-[#FDFBF7] rounded-lg border border-[#EAE3D5]">
+                            <div className="p-2 bg-[#FDFBF7] rounded-lg border border-guofeng-gold/20">
                               <Star className="w-4 h-4 text-guofeng-gold" />
                             </div>
-                            <span className="text-sm font-serif font-black text-guofeng-ink tracking-widest">先天命盘解读</span>
+                            <span className="text-sm font-serif font-black text-guofeng-ink tracking-widest">先天命盘 · 八字简牍</span>
                           </div>
-                          <div className="grid grid-cols-1 gap-4">
+                          <div className="grid grid-cols-4 gap-2">
                             {result.bazi.map((item: any, idx: number) => (
-                              <div key={idx} className="flex items-center space-x-6 p-5 bg-[#FDFBF7] rounded-2xl border border-[#EAE3D5]">
-                                <div className="w-14 text-center border-r border-[#EAE3D5] pr-6">
-                                  <div className="text-[10px] text-guofeng-red font-serif font-bold mb-2">{item.label}</div>
-                                  <div className="text-xl font-serif font-black text-guofeng-ink leading-tight">{item.stem}</div>
-                                  <div className="text-xl font-serif font-black text-guofeng-ink leading-tight">{item.branch}</div>
+                              <div key={idx} className="guofeng-bamboo py-6 px-1 flex flex-col items-center border border-guofeng-gold/10 relative group">
+                                <div className="absolute top-0 left-0 w-full h-[2px] bg-guofeng-red/20"></div>
+                                <div className="text-[9px] text-guofeng-red font-serif font-black mb-4 writing-mode-vertical whitespace-nowrap opacity-60 tracking-widest leading-none">{item.label}</div>
+                                <div className="flex flex-col items-center mb-4">
+                                  <div className="text-2xl font-serif font-black text-guofeng-ink leading-tight">{item.stem}</div>
+                                  <div className="text-2xl font-serif font-black text-guofeng-ink leading-tight">{item.branch}</div>
                                 </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-1.5">
-                                    <div className="text-[10px] text-guofeng-gold font-serif font-bold">{item.desc}</div>
-                                    <div className="w-1 h-1 bg-guofeng-gold/30 rounded-full"></div>
-                                    <div className="text-[10px] text-guofeng-ink/40 font-serif font-bold">{item.modern}</div>
-                                  </div>
-                                  <div className="text-xs text-guofeng-ink/60 leading-relaxed font-serif">{item.vernacular}</div>
-                                </div>
+                                <div className="guofeng-stamp-sm scale-75 opacity-40 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[8px]">{item.desc}</div>
                               </div>
                             ))}
+                          </div>
+                          <div className="guofeng-divider-ornate">
+                            <span className="px-4 text-[10px] font-serif text-guofeng-gold">灵犀一指 · Interpretation</span>
+                          </div>
+                          <div className="space-y-4">
+                             {result.bazi.map((item: any, idx: number) => (
+                               <div key={`desc-${idx}`} className="flex space-x-3 items-start">
+                                 <div className="text-[10px] font-serif font-black text-guofeng-red mt-1 px-1.5 py-0.5 border border-guofeng-red/20 rounded-md shrink-0">{item.label.charAt(0)}</div>
+                                 <p className="text-xs text-guofeng-ink/60 font-serif leading-relaxed italic">{item.vernacular}</p>
+                               </div>
+                             ))}
                           </div>
                         </div>
 
@@ -1956,8 +2158,26 @@ ${divinationResult.advice}
                             exit={{ opacity: 0, y: -10 }}
                             className="space-y-8"
                           >
-                            <div className="text-center">
-                              <h2 className="text-2xl font-serif font-black mb-2">心诚则灵</h2>
+                            <div className="flex items-center justify-between mb-8">
+                              {divinationCategory ? (
+                                <button
+                                  onClick={() => {
+                                    setDivinationCategory(null);
+                                    setDivinationOption(null);
+                                    setDivinationSubAnswer('');
+                                  }}
+                                  className="flex items-center space-x-2 text-guofeng-ink/40 hover:text-guofeng-red transition-colors font-serif font-bold text-sm"
+                                >
+                                  <ArrowLeft size={16} />
+                                  <span>重选维度</span>
+                                </button>
+                              ) : (
+                                <div className="w-12" />
+                              )}
+                              <h2 className="text-2xl font-serif font-black">心诚则灵</h2>
+                              <div className="w-12" />
+                            </div>
+                            <div className="text-center mb-8">
                               <p className="text-xs text-guofeng-ink/40 font-serif">闭目冥想，在心中默念你的困惑或愿望</p>
                             </div>
 
@@ -2554,10 +2774,14 @@ ${divinationResult.advice}
                               <div className="absolute -top-4 -left-4 w-24 h-24 bg-red-50 rounded-full blur-2xl opacity-50"></div>
                               <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-orange-50 rounded-full blur-2xl opacity-50"></div>
                               
-                              <div className="guofeng-card p-10 text-center relative overflow-hidden border-2 border-guofeng-red/10">
-                                <div className="absolute top-0 left-0 w-full h-1.5 bg-guofeng-red"></div>
+                              <div className="guofeng-card p-10 text-center relative overflow-hidden border-2 border-guofeng-gold/10 group guofeng-border-hui shadow-2xl">
+                                <div className="absolute top-0 left-0 w-full h-1.5 bg-guofeng-red animate-pulse"></div>
+                                <div className="absolute -top-10 -left-10 w-32 h-32 bg-guofeng-red/5 rounded-full blur-3xl group-hover:bg-guofeng-red/10 transition-colors"></div>
                                 
-                                <div className="text-[10px] font-serif font-bold text-guofeng-red uppercase tracking-[0.4em] mb-4">
+                                <div className="guofeng-stamp-complex guofeng-stamp-reveal absolute top-8 right-8 text-[12px] rotate-12 z-20">
+                                  {divinationResult.lotNumber}
+                                </div>
+                                <div className="text-[10px] font-serif font-bold text-guofeng-red uppercase tracking-[0.4em] mb-4 opacity-40 guofeng-brush-border inline-block">
                                   {divinationResult.element} · {divinationResult.lotNumber}
                                 </div>
                                 <div className="text-3xl font-serif font-black text-guofeng-red mb-8 tracking-widest">
@@ -2607,10 +2831,10 @@ ${divinationResult.advice}
                                   ))}
                                 </div>
 
-                                <div className="h-[1px] w-16 bg-guofeng-gold/20 mx-auto mb-10"></div>
+                                <div className="guofeng-divider"></div>
 
                                 <div className="space-y-8 text-left">
-                                  <div className="p-6 bg-[#FDFBF7] rounded-2xl border border-[#EAE3D5] relative">
+                                  <div className="p-6 bg-[#FDFBF7] rounded-2xl border border-[#EAE3D5] relative mt-4">
                                     <div className="absolute -top-3 left-6 px-3 bg-white border border-[#EAE3D5] rounded-full text-[10px] font-serif font-bold text-guofeng-red">白话解读</div>
                                     <p className="text-sm text-guofeng-ink/70 leading-relaxed font-serif">
                                       {divinationResult.vernacular}
@@ -2634,17 +2858,40 @@ ${divinationResult.advice}
                               </div>
                             </div>
 
-                            <div className="flex space-x-4">
+                            <div className="space-y-3">
                               <button
-                                onClick={() => setDivinationStep('input')}
-                                className="flex-1 py-4 bg-white border border-[#EAE3D5] rounded-2xl text-sm font-serif font-bold text-guofeng-ink/40 hover:text-guofeng-red transition-all flex items-center justify-center space-x-2"
+                                onClick={() => setShowWallpaperModal(true)}
+                                className="w-full py-4 bg-guofeng-gold text-white rounded-2xl text-sm font-serif font-bold shadow-lg shadow-yellow-900/10 active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
                               >
-                                <RefreshCw size={16} />
-                                <span>{divinationType === 'stick' ? '再求一签' : '再次起卦'}</span>
+                                <Camera size={16} />
+                                <span>生成签文壁纸</span>
                               </button>
+                              
+                              <div className="flex space-x-4">
+                                <button
+                                  onClick={() => {
+                                    setDivinationStep('input');
+                                    setDivinationCategory(null);
+                                    setDivinationOption(null);
+                                    setDivinationSubAnswer('');
+                                    setDivinationResult(null);
+                                  }}
+                                  className="flex-1 py-4 bg-white border border-[#EAE3D5] rounded-2xl text-sm font-serif font-bold text-guofeng-ink/40 hover:text-guofeng-red transition-all flex items-center justify-center space-x-2"
+                                >
+                                  <ArrowLeft size={16} />
+                                  <span>返回重选</span>
+                                </button>
+                                <button
+                                  onClick={() => setDivinationStep('input')}
+                                  className="flex-1 py-4 bg-white border border-[#EAE3D5] rounded-2xl text-sm font-serif font-bold text-guofeng-ink/40 hover:text-guofeng-red transition-all flex items-center justify-center space-x-2"
+                                >
+                                  <RefreshCw size={16} />
+                                  <span>{divinationType === 'stick' ? '再求一签' : '再次起卦'}</span>
+                                </button>
+                              </div>
                               <button
                                 onClick={handleShareDivination}
-                                className="flex-1 py-4 guofeng-button text-sm font-serif font-bold flex items-center justify-center space-x-2"
+                                className="w-full py-4 guofeng-button text-sm font-serif font-bold flex items-center justify-center space-x-2"
                               >
                                 <Share2 size={16} />
                                 <span>{divinationType === 'stick' ? '分享灵签' : '分享卦象'}</span>
@@ -2667,7 +2914,7 @@ ${divinationResult.advice}
                   >
                     <div className="flex items-center space-x-4 mb-6">
                       <button 
-                        onClick={() => setMainTab('divination')}
+                        onClick={() => setMainTab('report')}
                         className="p-2 bg-white rounded-full border border-[#EAE3D5] text-guofeng-ink/40 hover:text-guofeng-red transition-colors"
                       >
                         <ChevronLeft size={20} />
@@ -2755,11 +3002,12 @@ ${divinationResult.advice}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
                           onClick={() => setCommunityView('featured')}
-                          className="guofeng-card p-5 bg-gradient-to-r from-guofeng-red/5 to-transparent border-guofeng-red/10 cursor-pointer group"
+                          className="guofeng-card p-5 bg-gradient-to-r from-guofeng-red/5 to-transparent border-guofeng-red/20 cursor-pointer group guofeng-border-hui"
                         >
-                          <div className="flex items-center justify-between">
+                          <div className="absolute top-0 right-0 w-20 h-full opacity-[0.02] guofeng-pattern pointer-events-none"></div>
+                          <div className="flex items-center justify-between relative z-10">
                             <div className="flex items-center space-x-4">
-                              <div className="w-10 h-10 bg-guofeng-red/10 rounded-2xl flex items-center justify-center text-guofeng-red">
+                              <div className="w-10 h-10 bg-guofeng-red/10 rounded-2xl flex items-center justify-center text-guofeng-red guofeng-border-hui border-guofeng-red/10">
                                 <Sparkles size={20} />
                               </div>
                               <div>
@@ -2781,13 +3029,16 @@ ${divinationResult.advice}
                         </motion.div>
 
                     {/* Leaderboard Preview */}
-                    <div className="guofeng-card p-6 bg-gradient-to-br from-guofeng-gold/5 to-transparent border-guofeng-gold/20">
-                      <div className="flex items-center justify-between mb-4">
+                    <div className="guofeng-card p-6 bg-gradient-to-br from-guofeng-gold/5 to-transparent border-guofeng-gold/30 guofeng-border-hui">
+                      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-guofeng-gold/30 to-transparent"></div>
+                      <div className="flex items-center justify-between mb-4 relative z-10">
                         <div className="flex items-center space-x-2">
                           <Trophy size={16} className="text-guofeng-gold" />
-                          <span className="text-sm font-serif font-black text-guofeng-ink">本月锦鲤榜</span>
+                          <span className="text-sm font-serif font-black text-guofeng-ink tracking-widest">本月锦鲤榜</span>
                         </div>
-                        <button className="text-[10px] text-guofeng-gold font-serif font-bold">查看全部</button>
+                        <button className="text-[10px] text-guofeng-gold font-serif font-bold group flex items-center">
+                          查看全部 <ChevronRight size={10} className="ml-0.5 group-hover:translate-x-0.5 transition-transform" />
+                        </button>
                       </div>
                       <div className="relative">
                         <div className="flex flex-nowrap items-center space-x-6 overflow-x-auto no-scrollbar pb-2 cursor-grab active:cursor-grabbing">
@@ -2838,6 +3089,31 @@ ${divinationResult.advice}
                               />
                             </div>
                           </div>
+                          
+                          {/* Mood Selector */}
+                          <div className="mb-6">
+                            <p className="text-[10px] font-serif font-bold text-guofeng-ink/40 mb-3 flex items-center">
+                              <Palette size={12} className="mr-2" />
+                              选择今日心情徽章
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {MOODS.map((mood) => (
+                                <button
+                                  key={mood.id}
+                                  onClick={() => setSelectedMood(mood.id)}
+                                  className={`px-4 py-2 rounded-full text-[10px] font-serif font-bold border transition-all flex items-center space-x-1.5 ${
+                                    selectedMood === mood.id 
+                                      ? 'bg-guofeng-red text-white border-guofeng-red shadow-md' 
+                                      : 'bg-[#FDFBF7] text-guofeng-ink/40 border-[#EAE3D5] hover:border-guofeng-red/20'
+                                  }`}
+                                >
+                                  <span>{mood.emoji}</span>
+                                  <span>{mood.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
                           <div className="flex items-center justify-between">
                             <div className="flex space-x-3">
                               <button className="p-2.5 text-guofeng-ink/40 hover:text-guofeng-red transition-colors bg-[#FDFBF7] rounded-xl border border-[#EAE3D5]">
@@ -2874,6 +3150,12 @@ ${divinationResult.advice}
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
+                              {post.mood && (
+                                <div className="px-3 py-1 rounded-full text-[10px] font-serif font-bold bg-[#FDFBF7] border border-[#EAE3D5] text-guofeng-ink/60 flex items-center space-x-1">
+                                  <span>{MOODS.find(m => m.id === post.mood)?.emoji}</span>
+                                  <span>{MOODS.find(m => m.id === post.mood)?.label}</span>
+                                </div>
+                              )}
                               <div className={`px-3 py-1 rounded-full text-[10px] font-serif font-bold border ${
                                 post.type === 'chart' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
                                 post.type === 'fortune' ? 'bg-yellow-50 text-guofeng-gold border-yellow-100' : 
@@ -2990,6 +3272,13 @@ ${divinationResult.advice}
                                     <Send size={16} />
                                   </button>
                                 </div>
+                                <button 
+                                  onClick={() => setExpandedPostComments(null)}
+                                  className="w-full py-2 mt-2 text-[10px] font-serif font-bold text-guofeng-ink/20 hover:text-guofeng-red transition-colors flex items-center justify-center space-x-1"
+                                >
+                                  <ArrowLeft size={10} className="rotate-90" />
+                                  <span>收起评论</span>
+                                </button>
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -3091,7 +3380,12 @@ ${divinationResult.advice}
                       <>
                         <div className="guofeng-card p-12 text-center relative overflow-hidden">
                           <div className="absolute top-0 left-0 w-full h-1 bg-guofeng-red"></div>
-                          <Trophy className="w-16 h-16 mx-auto mb-6 text-guofeng-gold" />
+                          
+                          <GrowthPlant 
+                            streak={checkInStreak} 
+                            checkedInToday={checkInDates.includes(new Date().toISOString().split('T')[0])} 
+                          />
+                          
                           <div className="text-[10px] font-serif font-bold text-guofeng-red uppercase tracking-[0.3em] mb-4">坚持打卡 · Daily Check-in</div>
                           <div className="text-6xl font-serif font-black text-guofeng-ink mb-4">{checkInStreak}</div>
                           <div className="text-xs font-serif text-guofeng-ink/40 tracking-widest">连续打卡天数</div>
@@ -3238,7 +3532,7 @@ ${divinationResult.advice}
                             <HelpCircle size={16} className="text-guofeng-gold" />
                           </div>
                           
-                          <div className="space-y-4 max-h-80 overflow-y-auto no-scrollbar">
+                          <div className="space-y-4 max-h-80 overflow-y-auto no-scrollbar mb-6">
                             {qaList.length === 0 ? (
                               <div className="text-center py-8 space-y-3">
                                 <p className="text-xs text-guofeng-ink/30 font-serif">暂无咨询记录</p>
@@ -3252,16 +3546,43 @@ ${divinationResult.advice}
                                     </div>
                                     <p className="text-xs font-serif font-bold text-guofeng-ink leading-relaxed">{qa.question}</p>
                                   </div>
-                                  {qa.answer && (
+                                  {qa.answer || qa.loading ? (
                                     <div className="pl-8 border-l-2 border-guofeng-gold/20">
-                                      <p className="text-[10px] text-guofeng-ink/60 font-serif leading-relaxed italic">
-                                        {qa.answer}
-                                      </p>
+                                      {qa.loading ? (
+                                        <div className="flex items-center space-x-2 py-2">
+                                          <div className="w-1.5 h-1.5 bg-guofeng-gold rounded-full animate-bounce"></div>
+                                          <div className="w-1.5 h-1.5 bg-guofeng-gold rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                          <div className="w-1.5 h-1.5 bg-guofeng-gold rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                        </div>
+                                      ) : (
+                                        <p className="text-[10px] text-guofeng-ink/60 font-serif leading-relaxed italic">
+                                          {qa.answer}
+                                        </p>
+                                      )}
                                     </div>
-                                  )}
+                                  ) : null}
                                 </div>
                               ))
                             )}
+                          </div>
+
+                          {/* New Consultation Input */}
+                          <div className="flex items-center space-x-3 p-3 bg-[#FDFBF7] rounded-2xl border border-[#EAE3D5]">
+                            <input
+                              type="text"
+                              value={question}
+                              onChange={(e) => setQuestion(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && handleAsk()}
+                              placeholder="有什么疑惑想咨询 AI 导师？"
+                              className="flex-1 bg-transparent border-none outline-none text-xs font-serif placeholder:text-guofeng-ink/20 px-2"
+                            />
+                            <button
+                              onClick={handleAsk}
+                              disabled={!question.trim()}
+                              className="p-2 bg-guofeng-red text-white rounded-xl shadow-lg shadow-red-900/10 disabled:opacity-30 transition-opacity"
+                            >
+                              <Send size={14} />
+                            </button>
                           </div>
                         </div>
 
@@ -3275,35 +3596,35 @@ ${divinationResult.advice}
                           </button>
                         </div>
                       </div>
+                    )}
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              </AnimatePresence>
+            </div>
 
             {/* Report Modal */}
-            <AnimatePresence>
-              {showReportModal && (
+          <AnimatePresence>
+            {showReportModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-guofeng-ink/40 backdrop-blur-md flex items-center justify-center px-6"
+              >
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[100] bg-guofeng-ink/40 backdrop-blur-md flex items-center justify-center px-6"
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  className="guofeng-card w-full max-w-sm max-h-[80vh] overflow-y-auto no-scrollbar relative p-8"
                 >
-                  <motion.div
-                    initial={{ scale: 0.9, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.9, y: 20 }}
-                    className="guofeng-card w-full max-w-sm max-h-[80vh] overflow-y-auto no-scrollbar relative p-8"
+                  <button 
+                    onClick={() => setShowReportModal(false)}
+                    className="absolute top-4 right-4 p-2 text-guofeng-ink/20 hover:text-guofeng-red transition-colors"
                   >
-                    <button 
-                      onClick={() => setShowReportModal(false)}
-                      className="absolute top-4 right-4 p-2 text-guofeng-ink/20 hover:text-guofeng-red transition-colors"
-                    >
-                      <Plus className="rotate-45" size={24} />
-                    </button>
+                    <Plus className="rotate-45" size={24} />
+                  </button>
 
-                    {isGeneratingReport ? (
+                  {isGeneratingReport ? (
                       <div className="py-20 text-center space-y-6">
                         <RefreshCw className="w-12 h-12 text-guofeng-red animate-spin mx-auto" />
                         <p className="text-sm font-serif font-bold text-guofeng-ink">正在深度解析您的灵性轨迹...</p>
@@ -3401,29 +3722,154 @@ ${divinationResult.advice}
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+        )}
+
+        {/* Wallpaper Modal */}
+        <AnimatePresence>
+          {showWallpaperModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-guofeng-ink/80 backdrop-blur-md p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="max-w-xs w-full relative flex flex-col items-center"
+              >
+                {/* Close Button */}
+                <button 
+                  onClick={() => setShowWallpaperModal(false)}
+                  className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white"
+                >
+                  <Plus size={24} className="rotate-45" />
+                </button>
+
+                {/* Wallpaper Canvas Container */}
+                <div 
+                  ref={wallpaperRef}
+                  className="w-full aspect-[9/16] bg-guofeng-paper rounded-2xl shadow-2xl relative overflow-hidden p-8 flex flex-col"
+                >
+                  {/* Background Patterns for Wallpaper */}
+                  <div className="absolute inset-0 opacity-[0.08] guofeng-fret-pattern"></div>
+                  <div className="absolute inset-0 guofeng-cloud-pattern opacity-[0.05]"></div>
+                  <div className="absolute -top-20 -right-20 w-64 h-64 bg-guofeng-red/5 rounded-full blur-3xl"></div>
+                  <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-guofeng-gold/5 rounded-full blur-3xl"></div>
+
+                  {/* Wallpaper Content */}
+                  <div className="relative z-10 flex-1 flex flex-col items-center text-center">
+                    <div className="mt-4 mb-8">
+                      <div className="guofeng-stamp-sm text-[10px] scale-125 mb-2">窥探天机</div>
+                      <div className="text-[8px] font-mono text-guofeng-ink/30 tracking-widest">
+                        {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-10 py-10">
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-serif font-black text-guofeng-gold tracking-[0.3em] uppercase">
+                          {divinationType === 'stick' ? '灵签所指' : '卦象大意'}
+                        </div>
+                        <h2 className="text-3xl font-serif font-black text-guofeng-ink">
+                          {divinationResult?.title}
+                        </h2>
+                        {divinationType === 'stick' && (
+                          <div className="text-sm font-serif font-bold text-guofeng-red mt-1">
+                            {divinationResult?.lotNumber}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-guofeng-red/5 p-8 rounded-3xl border border-guofeng-red/10 relative">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 py-1 rounded-full border border-guofeng-red/10">
+                          <Sparkles size={12} className="text-guofeng-red" />
+                        </div>
+                        <div className="writing-mode-vertical mx-auto h-40 flex items-center justify-center space-x-6">
+                          {divinationResult?.poem.split('，').map((line: string, i: number) => (
+                            <p key={i} className="text-lg font-serif font-black text-guofeng-ink tracking-widest leading-loose">
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 max-w-[200px]">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="h-px w-6 bg-guofeng-gold/30"></div>
+                          <span className="text-[10px] font-serif font-black text-guofeng-gold">本期关键词</span>
+                          <div className="h-px w-6 bg-guofeng-gold/30"></div>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {(divinationResult?.advice || "保持谦逊, 静待良机").split(/[,，。]/).slice(0, 3).map((keyword: string, i: number) => (
+                            <span key={i} className="px-3 py-1 bg-white border border-[#EAE3D5] rounded-full text-[9px] font-serif font-bold text-guofeng-ink/60">
+                              {keyword.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto pt-8 flex flex-col items-center">
+                      <div className="w-12 h-12 p-1 bg-white border-2 border-guofeng-gold/20 rounded-xl mb-3 flex items-center justify-center opacity-40 grayscale">
+                        {/* Mock QR Code */}
+                        <LayoutGrid size={24} className="text-guofeng-ink" />
+                      </div>
+                      <p className="text-[8px] font-serif font-black text-guofeng-ink/20 tracking-tighter">长按扫码 · 洞悉先机</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-8 flex flex-col items-center space-y-4 w-full">
+                  <button
+                    onClick={handleDownloadWallpaper}
+                    disabled={generatingWallpaper}
+                    className="w-full py-4 guofeng-button flex items-center justify-center space-x-3 shadow-2xl"
+                  >
+                    {generatingWallpaper ? (
+                      <RefreshCw size={18} className="animate-spin" />
+                    ) : (
+                      <Download size={18} />
+                    )}
+                    <span className="font-serif font-bold tracking-widest">
+                      {generatingWallpaper ? '正在雕琢壁纸...' : '保存至相册'}
+                    </span>
+                  </button>
+                  <p className="text-white/40 text-[10px] font-serif flex items-center">
+                    <Info size={10} className="mr-1" />
+                    保存后可分享至朋友圈或设为手机壁纸
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
             {/* Bottom Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-[#EAE3D5] px-8 py-5 z-30">
-              <div className="max-w-md mx-auto flex items-center justify-between">
-                {[
-                  { id: 'divination', label: '求签', icon: Dices },
-                  { id: 'report', label: '报告', icon: Star },
-                  { id: 'community', label: '社区', icon: MessageSquare },
-                  { id: 'checkin', label: '打卡', icon: CheckCircle2 },
-                  { id: 'profile', label: '中心', icon: User2 },
-                ].map((nav) => (
-                  <button
-                    key={nav.id}
-                    onClick={() => setMainTab(nav.id as MainTab)}
-                    className={`flex flex-col items-center space-y-1.5 transition-all ${
-                      mainTab === nav.id || (nav.id === 'divination' && mainTab === 'featured') ? 'text-guofeng-red scale-110' : 'text-guofeng-ink/30'
-                    }`}
-                  >
-                    <nav.icon size={22} className={mainTab === nav.id || (nav.id === 'divination' && mainTab === 'featured') ? 'fill-red-50' : ''} />
-                    <span className="text-[10px] font-serif font-bold tracking-widest">{nav.label}</span>
-                  </button>
-                ))}
-              </div>
+            {!((!result && !isGuest) || showLandingForm) && (
+              <div className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 bg-guofeng-paper/95 backdrop-blur-xl border-t border-guofeng-gold/20 px-8 py-5 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-guofeng-red/20 to-transparent"></div>
+                <div className="flex items-center justify-between">
+              {[
+                { id: 'divination', label: '求签', icon: Dices },
+                { id: 'report', label: '报告', icon: Star },
+                { id: 'community', label: '社区', icon: MessageSquare },
+                { id: 'checkin', label: '打卡', icon: CheckCircle2 },
+                { id: 'profile', label: '中心', icon: User2 },
+              ].map((nav) => (
+                <button
+                  key={nav.id}
+                  onClick={() => setMainTab(nav.id as MainTab)}
+                  className={`flex flex-col items-center space-y-1.5 transition-all ${
+                    mainTab === nav.id || (nav.id === 'divination' && mainTab === 'featured') ? 'text-guofeng-red scale-110' : 'text-guofeng-ink/30'
+                  }`}
+                >
+                  <nav.icon size={22} className={mainTab === nav.id || (nav.id === 'divination' && mainTab === 'featured') ? 'fill-red-50' : ''} />
+                  <span className="text-[10px] font-serif font-bold tracking-widest">{nav.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}

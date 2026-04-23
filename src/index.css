@@ -5,21 +5,177 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Noto Serif SC", serif;
   
-  --color-guofeng-bg: #F9F6F1;
-  --color-guofeng-red: #C84B31;
-  --color-guofeng-gold: #D4AF37;
-  --color-guofeng-ink: #2D2D2D;
-  --color-guofeng-paper: #FFFFFF;
+  --color-guofeng-bg: #F5F1E6;      /* 绢纸色 */
+  --color-guofeng-red: #B52F25;     /* 辰砂红 */
+  --color-guofeng-gold: #C0A46B;    /* 檀金 */
+  --color-guofeng-ink: #1C1C1C;     /* 鸦青/墨色 */
+  --color-guofeng-paper: #FCF9F2;   /* 宣纸色 */
+  --color-guofeng-cyan: #7E9680;    /* 艾绿 */
+  
+  --animate-drift: drift 20s ease-in-out infinite;
+  --animate-ink-pulse: ink-pulse 10s ease-in-out infinite;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(2%, 3%) scale(1.05); }
+  66% { transform: translate(-1%, 2%) scale(0.98); }
+}
+
+@keyframes ink-pulse {
+  0%, 100% { opacity: 0.05; transform: scale(1); }
+  50% { opacity: 0.15; transform: scale(1.2); }
 }
 
 @layer base {
   body {
     @apply bg-guofeng-bg text-guofeng-ink font-sans antialiased;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      url("https://www.transparenttextures.com/patterns/natural-paper.png");
   }
 }
 
 .guofeng-card {
-  @apply bg-guofeng-paper rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#EAE3D5];
+  @apply bg-guofeng-paper rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E0D8C3] relative overflow-hidden;
+  box-shadow: inset 0 0 40px rgba(212, 175, 55, 0.03);
+}
+
+/* Hui-Wen (Meander Pattern) Border */
+.guofeng-border-hui {
+  position: relative;
+  border: 1px solid rgba(192, 164, 107, 0.3);
+}
+
+.guofeng-border-hui::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(192, 164, 107, 0.1);
+  pointer-events: none;
+}
+
+/* Red Seal/Stamp Animation */
+.guofeng-stamp-reveal {
+  animation: stamp-apply 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes stamp-apply {
+  0% { transform: scale(3) rotate(-10deg); opacity: 0; filter: blur(4px); }
+  70% { transform: scale(0.9) rotate(0deg); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+}
+
+/* Bamboo Slip Texture */
+.guofeng-bamboo {
+  background: linear-gradient(90deg, 
+    rgba(0,0,0,0.02) 0%, 
+    transparent 5%, 
+    transparent 95%, 
+    rgba(0,0,0,0.02) 100%
+  ), #FCF9F2;
+  border-left: 1px solid rgba(0,0,0,0.05);
+  border-right: 1px solid rgba(0,0,0,0.05);
+}
+
+.guofeng-hollow-text {
+  -webkit-text-stroke: 1px currentColor;
+  color: transparent;
+}
+
+/* Floating Auspicious Cloud */
+.animate-float-cloud {
+  animation: float-cloud 8s ease-in-out infinite;
+}
+
+@keyframes float-cloud {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(20px) translateY(-10px); }
+}
+
+.guofeng-divider-ornate {
+  @apply flex items-center justify-center my-8 opacity-40;
+}
+
+.guofeng-divider-ornate::before,
+.guofeng-divider-ornate::after {
+  content: '';
+  @apply h-[1px] flex-1 bg-gradient-to-r from-transparent via-guofeng-gold/50 to-transparent;
+}
+
+.guofeng-brush-border {
+  position: relative;
+}
+
+.guofeng-brush-border::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='20' viewBox='0 0 200 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 Q 50 0, 100 10 T 200 10' stroke='%23B52F25' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+}
+
+.guofeng-cloud-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='60' viewBox='0 0 100 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 40 Q 35 30, 45 35 Q 55 25, 65 35 Q 75 30, 70 45 L 30 45 Z' fill='none' stroke='%23C0A46B' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M10 20 Q 15 10, 25 15 Q 35 5, 45 15 Q 55 10, 50 25 L 10 25 Z' fill='none' stroke='%23C0A46B' stroke-width='0.3' opacity='0.2'/%3E%3C/svg%3E");
+  background-size: 200px 120px;
+}
+
+.guofeng-fret-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0 h40 v40 h-40 z M5 5 h30 v30 h-30 z M10 10 h20 v20 h-20 z' fill='none' stroke='%23C0A46B' stroke-width='0.5' opacity='0.1'/%3E%3C/svg%3E");
+  background-size: 40px 40px;
+}
+
+.guofeng-ink-spots {
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(28, 28, 28, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(181, 47, 37, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(192, 164, 107, 0.04) 0%, transparent 60%);
+  filter: blur(40px);
+}
+
+.animate-drift-slow {
+  animation: var(--animate-drift);
+}
+
+.animate-ink-pulse {
+  animation: var(--animate-ink-pulse);
+}
+
+.guofeng-ink-wash {
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+.guofeng-stamp-complex {
+  @apply p-2 border-2 border-double border-guofeng-red text-guofeng-red font-serif font-black;
+  box-shadow: 0 0 0 1px rgba(181, 47, 37, 0.4);
+  background-color: rgba(181, 47, 37, 0.02);
+}
+
+.guofeng-paper-texture {
+  background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
+}
+
+.guofeng-pattern {
+  background-image: radial-gradient(circle at 2px 2px, #EAE3D5 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.guofeng-stamp-sm {
+  @apply inline-flex items-center justify-center p-1 border-2 border-guofeng-red text-guofeng-red font-serif font-black leading-none;
+  box-shadow: inset 0 0 0 1px rgba(200, 75, 49, 0.2);
+}
+
+.guofeng-divider {
+  @apply h-px w-full bg-gradient-to-r from-transparent via-[#EAE3D5] to-transparent my-6 relative;
+}
+
+.guofeng-divider::after {
+  content: '◈';
+  @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] text-guofeng-gold bg-guofeng-paper px-2 leading-none;
 }
 
 .guofeng-button {
