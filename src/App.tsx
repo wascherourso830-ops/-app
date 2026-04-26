@@ -66,6 +66,7 @@ interface Post {
   image?: string;
   divinationData?: any;
   mood?: string;
+  healerReplied?: boolean;
 }
 
 const MOODS = [
@@ -82,6 +83,7 @@ interface Comment {
   content: string;
   time: string;
   createdAt: any;
+  isOfficial?: boolean;
 }
 
 interface QA {
@@ -408,7 +410,10 @@ export default function App() {
 
   // Check-in State
   const [checkInDates, setCheckInDates] = useState<string[]>([]);
+  const [checkInLetters, setCheckInLetters] = useState<Record<string, string>>({});
   const [checkInStreak, setCheckInStreak] = useState(0);
+  const [replyingToDate, setReplyingToDate] = useState<string | null>(null);
+  const [letterContent, setLetterContent] = useState('');
 
   // Q&A State
   const [qaList, setQaList] = useState<QA[]>([]);
@@ -417,6 +422,9 @@ export default function App() {
   // Divination State
   const [divinationQuestion, setDivinationQuestion] = useState('');
   const [divinationResult, setDivinationResult] = useState<any>(null);
+  const [followUpResult, setFollowUpResult] = useState<string | null>(null);
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
+  const [hasFollowedUp, setHasFollowedUp] = useState(false);
   const [isDivining, setIsDivining] = useState(false);
   const [divinationType, setDivinationType] = useState<'stick' | 'iching'>('stick');
   const [divinationStep, setDivinationStep] = useState<'input' | 'calm' | 'shake' | 'result'>('input');
@@ -445,6 +453,7 @@ export default function App() {
   const [showWallpaperModal, setShowWallpaperModal] = useState(false);
   const [generatingWallpaper, setGeneratingWallpaper] = useState(false);
   const wallpaperRef = useRef<HTMLDivElement>(null);
+  const processedPostIds = useRef<Set<string>>(new Set());
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -489,6 +498,27 @@ export default function App() {
     }
   };
 
+  const handleSaveLetter = async () => {
+    if (!user || !replyingToDate || !letterContent.trim()) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        [`checkInLetters.${replyingToDate}`]: letterContent.trim()
+      });
+      setReplyingToDate(null);
+      setLetterContent('');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
+  };
+
+  const getDaysDiff = (dateStr: string) => {
+    const d1 = new Date(dateStr);
+    const d2 = new Date();
+    d1.setHours(0, 0, 0, 0);
+    d2.setHours(0, 0, 0, 0);
+    return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24));
+  };
+
   // Sync User Data
   useEffect(() => {
     if (!user) return;
@@ -505,6 +535,7 @@ export default function App() {
           isTrueSolarTime: data.isTrueSolarTime ?? prev.isTrueSolarTime
         }));
         setCheckInDates(data.checkInDates || []);
+        setCheckInLetters(data.checkInLetters || {});
         setCheckInStreak(data.checkInStreak || 0);
         setUserProfile(data.profile || null);
         setIsSubscribed(data.isSubscribed || false);
@@ -566,6 +597,80 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [expandedPostComments]);
+
+  // Official Healer Auto-Reply Logic
+  useEffect(() => {
+    if (!user || !isAuthReady || posts.length === 0) return;
+
+    const healerAutoReply = async (post: Post) => {
+      if (processedPostIds.current.has(post.id) || post.healerReplied) return;
+      processedPostIds.current.add(post.id);
+
+      // Criteria: negative mood ('low' or 'night') or mentioning pain/sadness
+      const isNegativeMood = post.mood === 'low' || post.mood === 'night';
+      const contentLower = post.content.toLowerCase();
+      const hasPainKeywords = contentLower.includes('伤心') || contentLower.includes('难过') || 
+                               contentLower.includes('想哭') || contentLower.includes('绝望') || 
+                               contentLower.includes('压力') || contentLower.includes('不开心');
+
+      if (!isNegativeMood && !hasPainKeywords) return;
+
+      try {
+        // Double check in DB if healerReplied is true
+        const postRef = doc(db, 'posts', post.id);
+        const postSnap = await getDoc(postRef);
+        if (postSnap.exists() && postSnap.data().healerReplied) return;
+
+        // Mark as replied
+        await updateDoc(postRef, { healerReplied: true });
+
+        const prompt = `你是一位专业的“官方治愈师”。
+        社区里有一位用户发布了心情为“${MOODS.find(m => m.id === post.mood)?.label || '治愈'}”的内容：
+        “${post.content}”
+        
+        请以官方治愈师的身份，给他一个极其温暖、共情且有力量的回复。
+        要求：
+        1. 语气温柔、平静、富有禅意。
+        2. 肯定他的真实感受，让他觉得自己的情绪是被接纳的。
+        3. 开头可以是“谢谢你告诉我真实的感受，这对我很重要❤️”或者类似体现重视的句子。
+        4. 最后给出一个很小的舒缓建议（如深呼吸、看星星等）。
+        5. 字数控制在40-60字左右。
+        6. 不要使用“你好”、“亲爱的”等客服式开头。`;
+
+        const result = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt
+        });
+
+        const healerText = result.text || "谢谢你分享这一刻。你的感受我们都听到了，此刻的脆弱也是一种力量。别怕，给自己一点时间深呼吸，星星一直都在云层后面。❤️";
+
+        // Add the official comment
+        await addDoc(collection(db, 'posts', post.id, 'comments'), {
+          author: "官方治愈师",
+          authorUid: user.uid, // Posted from current user context but marked official
+          content: healerText,
+          createdAt: serverTimestamp(),
+          isOfficial: true
+        });
+
+      } catch (error) {
+        console.error("Healer Auto-Reply Error:", error);
+      }
+    };
+
+    // Check recent posts (within last 15 minutes)
+    const now = new Date();
+    posts.forEach(post => {
+      const pTime = (post as any).createdAt?.toDate?.() || now;
+      const isRecent = (now.getTime() - pTime.getTime()) < 15 * 60 * 1000;
+      
+      if (isRecent && post.authorUid !== user.uid && !post.healerReplied) {
+        // Small delay to simulate "screening"
+        setTimeout(() => healerAutoReply(post), 2000);
+      }
+    });
+
+  }, [posts, user, isAuthReady]);
 
   // Wish Example Carousel
   useEffect(() => {
@@ -1065,6 +1170,8 @@ ${divinationResult.advice}
     if (!yaoList) setIsDivining(true);
     setShakeCountdown(skipCountdown ? 0 : 3);
     setDivinationResult(null);
+    setFollowUpResult(null);
+    setHasFollowedUp(false);
 
     // For sticks, play shaking sound (wooden sticks colliding)
     let shakeAudio: HTMLAudioElement | null = null;
@@ -1222,6 +1329,35 @@ ${divinationResult.advice}
       setIsDivining(false);
       if (shakeAudio) shakeAudio.pause();
       setDivinationStep('input');
+    }
+  };
+
+  const handleFollowUp = async () => {
+    if (!divinationResult || hasFollowedUp || isFollowUpLoading) return;
+    
+    setIsFollowUpLoading(true);
+    try {
+      const prompt = `你是一位深度共情的命理大师。
+      用户对刚才的灵签解读（${divinationResult.vernacular}）还有些不太懂，希望你能用更具体、更口语化、生活化的方式进行延伸解读。
+      
+      事项：${divinationOption}
+      背景：${divinationQuestion}
+      所求签文：${divinationResult.title} - ${divinationResult.poem}
+      用户画像：${JSON.stringify(userProfile || {})}
+      
+      请提供补充解读，语气要像老友聊天一样，避开玄奥术语，多讲讲具体该怎么做，给些具体的行动指引。字数120字左右。内容不需要Markdown格式。`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt
+      });
+      
+      setFollowUpResult(response.text || "这一卦中似乎还有些迷雾，且容我再感悟一番。");
+      setHasFollowedUp(true);
+    } catch (error) {
+      console.error("Follow-up Error:", error);
+    } finally {
+      setIsFollowUpLoading(false);
     }
   };
 
@@ -2848,6 +2984,42 @@ ${divinationResult.advice}
                                     </p>
                                   </div>
 
+                                  {followUpResult && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      className="p-6 bg-blue-50/30 rounded-2xl border border-blue-100/50 relative"
+                                    >
+                                      <div className="absolute -top-3 left-6 px-3 bg-white border border-blue-100/50 rounded-full text-[10px] font-serif font-bold text-blue-600 flex items-center">
+                                        <MessageCircle size={10} className="mr-1" />
+                                        追问深度解读
+                                      </div>
+                                      <p className="text-sm text-guofeng-ink/70 leading-relaxed font-serif">
+                                        {followUpResult}
+                                      </p>
+                                    </motion.div>
+                                  )}
+
+                                  {!hasFollowedUp && (
+                                    <button 
+                                      onClick={handleFollowUp}
+                                      disabled={isFollowUpLoading}
+                                      className="w-full py-3 bg-[#FDFBF7] border border-[#EAE3D5] rounded-xl text-[11px] font-serif font-bold text-guofeng-ink/40 hover:text-guofeng-red hover:border-guofeng-red transition-all flex items-center justify-center space-x-2"
+                                    >
+                                      {isFollowUpLoading ? (
+                                        <>
+                                          <RefreshCw size={12} className="animate-spin" />
+                                          <span>正在感悟...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <MessageCircle size={12} />
+                                          <span>不太懂，再讲详细点？</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+
                                   <div className="p-6 bg-[#FDFBF7] rounded-2xl border border-[#EAE3D5] relative">
                                     <div className="absolute -top-3 left-6 px-3 bg-white border border-[#EAE3D5] rounded-full text-[10px] font-serif font-bold text-guofeng-ink/40">治愈建议</div>
                                     <p className="text-sm text-guofeng-ink/60 leading-relaxed font-serif italic">
@@ -3150,20 +3322,25 @@ ${divinationResult.advice}
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {post.mood && (
-                                <div className="px-3 py-1 rounded-full text-[10px] font-serif font-bold bg-[#FDFBF7] border border-[#EAE3D5] text-guofeng-ink/60 flex items-center space-x-1">
-                                  <span>{MOODS.find(m => m.id === post.mood)?.emoji}</span>
-                                  <span>{MOODS.find(m => m.id === post.mood)?.label}</span>
+                              {post.type === 'healing' ? (
+                                <div className={`px-3 py-1 rounded-full text-[10px] font-serif font-bold border ${
+                                  post.mood === 'low' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                  post.mood === 'night' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                  post.mood === 'slow' ? 'bg-green-50 text-green-600 border-green-100' :
+                                  'bg-yellow-50 text-guofeng-gold border-yellow-100'
+                                } flex items-center space-x-1`}>
+                                  <span>{MOODS.find(m => m.id === (post.mood || 'enlightened'))?.emoji}</span>
+                                  <span>{MOODS.find(m => m.id === (post.mood || 'enlightened'))?.label}</span>
+                                </div>
+                              ) : (
+                                <div className={`px-3 py-1 rounded-full text-[10px] font-serif font-bold border ${
+                                  post.type === 'chart' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                  post.type === 'fortune' ? 'bg-yellow-50 text-guofeng-gold border-yellow-100' : 
+                                  'bg-purple-50 text-purple-600 border-purple-100'
+                                }`}>
+                                  {post.type === 'chart' ? '命盘' : post.type === 'fortune' ? '运势' : '求助'}
                                 </div>
                               )}
-                              <div className={`px-3 py-1 rounded-full text-[10px] font-serif font-bold border ${
-                                post.type === 'chart' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                                post.type === 'fortune' ? 'bg-yellow-50 text-guofeng-gold border-yellow-100' : 
-                                post.type === 'divination_help' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                'bg-red-50 text-guofeng-red border-red-100'
-                              }`}>
-                                {post.type === 'chart' ? '命盘' : post.type === 'fortune' ? '运势' : post.type === 'divination_help' ? '求助' : '治愈'}
-                              </div>
                               {user?.uid === post.authorUid && (
                                 <button 
                                   onClick={() => handleDeletePost(post.id)}
@@ -3228,15 +3405,23 @@ ${divinationResult.advice}
                                 <div className="space-y-6 max-h-60 overflow-y-auto no-scrollbar">
                                   {commentsMap[post.id]?.map((comment) => (
                                     <div key={comment.id} className="flex space-x-4">
-                                      <div className="w-8 h-8 bg-[#FDFBF7] rounded-full flex items-center justify-center text-[10px] text-guofeng-ink/40 font-serif font-bold border border-[#EAE3D5] shrink-0">
-                                        {comment.author.charAt(0)}
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-serif font-bold border shrink-0 ${comment.isOfficial ? 'bg-guofeng-red text-white border-guofeng-red shadow-sm shadow-red-900/20' : 'bg-[#FDFBF7] text-guofeng-ink/40 border-[#EAE3D5]'}`}>
+                                        {comment.isOfficial ? <Sparkles size={12} /> : comment.author.charAt(0)}
                                       </div>
-                                      <div className="flex-1 bg-[#FDFBF7] rounded-2xl p-4 border border-[#EAE3D5]">
+                                      <div className={`flex-1 rounded-2xl p-4 border transition-all ${comment.isOfficial ? 'bg-guofeng-red/5 border-guofeng-red/20 ring-1 ring-guofeng-red/10' : 'bg-[#FDFBF7] border-[#EAE3D5]'}`}>
                                         <div className="flex items-center justify-between mb-2">
-                                          <span className="text-[10px] font-serif font-bold text-guofeng-ink">{comment.author}</span>
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-[10px] font-serif font-bold text-guofeng-ink">{comment.author}</span>
+                                            {comment.isOfficial && (
+                                              <span className="px-1.5 py-0.5 bg-guofeng-red text-white text-[8px] font-serif font-bold rounded flex items-center shrink-0">
+                                                <Heart size={8} className="mr-0.5 fill-current" />
+                                                治愈师
+                                              </span>
+                                            )}
+                                          </div>
                                           <div className="flex items-center space-x-2">
                                             <span className="text-[8px] text-guofeng-ink/40 font-serif">{comment.time}</span>
-                                            {(user?.uid === comment.authorUid || user?.uid === post.authorUid) && (
+                                            {(user?.uid === comment.authorUid || user?.uid === post.authorUid) && !comment.isOfficial && (
                                               <button 
                                                 onClick={() => handleDeleteComment(post.id, comment.id)}
                                                 className="p-1 text-guofeng-ink/20 hover:text-guofeng-red transition-colors"
@@ -3419,30 +3604,74 @@ ${divinationResult.advice}
                       </p>
                     </div>
 
-                    <div className="guofeng-card p-8">
-                      <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-sm font-serif font-black text-guofeng-ink tracking-widest">打卡日历</h3>
-                        <div className="text-[10px] text-guofeng-gold font-serif font-bold">2026年4月</div>
+                      <div className="guofeng-card p-8">
+                        <div className="flex items-center justify-between mb-8">
+                          <h3 className="text-sm font-serif font-black text-guofeng-ink tracking-widest">打卡日历</h3>
+                          <div className="text-[10px] text-guofeng-gold font-serif font-bold">2026年4月</div>
+                        </div>
+                        <div className="grid grid-cols-7 gap-3">
+                          {Array.from({ length: 30 }).map((_, i) => {
+                            const dateStr = `2026-04-${(i + 1).toString().padStart(2, '0')}`;
+                            const isChecked = checkInDates.includes(dateStr);
+                            const isToday = dateStr === new Date().toISOString().split('T')[0];
+                            return (
+                              <div 
+                                key={i}
+                                className={`aspect-square rounded-xl flex items-center justify-center text-xs font-serif font-bold transition-all border ${
+                                  isChecked ? 'bg-guofeng-red text-white border-guofeng-red shadow-md' : 
+                                  isToday ? 'border-2 border-guofeng-red text-guofeng-red' : 'bg-[#FDFBF7] text-guofeng-ink/20 border-[#EAE3D5]'
+                                }`}
+                              >
+                                {i + 1}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-7 gap-3">
-                        {Array.from({ length: 30 }).map((_, i) => {
-                          const dateStr = `2026-04-${(i + 1).toString().padStart(2, '0')}`;
-                          const isChecked = checkInDates.includes(dateStr);
-                          const isToday = dateStr === new Date().toISOString().split('T')[0];
-                          return (
-                            <div 
-                              key={i}
-                              className={`aspect-square rounded-xl flex items-center justify-center text-xs font-serif font-bold transition-all border ${
-                                isChecked ? 'bg-guofeng-red text-white border-guofeng-red shadow-md' : 
-                                isToday ? 'border-2 border-guofeng-red text-guofeng-red' : 'bg-[#FDFBF7] text-guofeng-ink/20 border-[#EAE3D5]'
-                              }`}
-                            >
-                              {i + 1}
-                            </div>
-                          );
-                        })}
+
+                      <div className="guofeng-card p-8">
+                        <div className="flex items-center justify-between mb-8">
+                          <h3 className="text-sm font-serif font-black text-guofeng-ink tracking-widest">打卡历史</h3>
+                          <History size={16} className="text-guofeng-gold" />
+                        </div>
+                        <div className="space-y-4 max-h-80 overflow-y-auto no-scrollbar">
+                          {checkInDates.length === 0 ? (
+                            <p className="text-center py-8 text-xs text-guofeng-ink/20 font-serif">暂无打卡记录</p>
+                          ) : (
+                            [...checkInDates].sort().reverse().map(dateStr => {
+                              const diff = getDaysDiff(dateStr);
+                              const hasLetter = !!checkInLetters[dateStr];
+                              return (
+                                <div key={dateStr} className="p-4 bg-[#FDFBF7] rounded-xl border border-[#EAE3D5]">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs font-serif font-bold text-guofeng-ink">{dateStr}</div>
+                                    {diff >= 3 && !hasLetter && (
+                                      <button 
+                                        onClick={() => setReplyingToDate(dateStr)}
+                                        className="px-3 py-1 bg-white border border-guofeng-gold text-guofeng-gold text-[10px] font-serif font-bold rounded-full hover:bg-guofeng-gold hover:text-white transition-all flex items-center space-x-1"
+                                      >
+                                        <Plus size={10} />
+                                        <span>给当天的自己说话</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {hasLetter && (
+                                    <div className="mt-3 p-3 bg-red-50/50 rounded-lg border border-red-100/50">
+                                      <div className="text-[10px] text-guofeng-red font-serif font-bold flex items-center mb-1">
+                                        <Heart size={10} className="mr-1 fill-current" />
+                                        未来的我来过
+                                      </div>
+                                      <p className="text-[11px] text-guofeng-ink/60 font-serif italic italic leading-relaxed">
+                                        "{checkInLetters[dateStr]}"
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     <div className="guofeng-card p-10 text-center">
                       <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-100">
@@ -3846,6 +4075,44 @@ ${divinationResult.advice}
             </motion.div>
           )}
         </AnimatePresence>
+
+      {/* Letter Modal */}
+      <AnimatePresence>
+        {replyingToDate && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-guofeng-ink/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="guofeng-card w-full max-w-sm p-8"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-serif font-black text-guofeng-ink">给当天的自己说话</h3>
+                <button onClick={() => setReplyingToDate(null)} className="text-guofeng-ink/20 hover:text-guofeng-red">
+                  <Plus className="rotate-45" size={24} />
+                </button>
+              </div>
+              <p className="text-[10px] text-guofeng-ink/40 font-serif mb-4">日期：{replyingToDate}</p>
+              <textarea
+                value={letterContent}
+                onChange={(e) => setLetterContent(e.target.value)}
+                placeholder="写给那天的自己一句话吧..."
+                className="w-full h-32 p-4 bg-[#FDFBF7] border border-[#EAE3D5] rounded-xl text-xs font-serif focus:border-guofeng-red focus:ring-0 resize-none mb-6"
+              />
+              <button
+                onClick={handleSaveLetter}
+                className="w-full py-4 guofeng-button text-sm font-serif font-bold"
+              >
+                寄出信件
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
             {/* Bottom Navigation */}
             {!((!result && !isGuest) || showLandingForm) && (

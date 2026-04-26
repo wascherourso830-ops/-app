@@ -12,6 +12,7 @@
         "birthTime": { "type": "string" },
         "isTrueSolarTime": { "type": "boolean" },
         "checkInDates": { "type": "array", "items": { "type": "string" } },
+        "checkInLetters": { "type": "object", "additionalProperties": { "type": "string" } },
         "checkInStreak": { "type": "integer" },
         "isSubscribed": { "type": "boolean" },
         "profile": {
