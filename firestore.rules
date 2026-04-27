@@ -55,8 +55,8 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.uid == request.auth.uid &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+      return (!('uid' in data) || data.uid == request.auth.uid) &&
+             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 100)) &&
              (!('gender' in data) || data.gender in ['male', 'female', 'other']) &&
              (!('birthDate' in data) || data.birthDate is string) &&
              (!('birthTime' in data) || data.birthTime is string) &&

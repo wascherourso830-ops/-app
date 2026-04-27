@@ -489,10 +489,10 @@ export default function App() {
     const path = `users/${user.uid}`;
     const userRef = doc(db, 'users', user.uid);
     try {
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         'profile.luckScore': increment(Math.floor(Math.random() * 10) + 1),
         'profile.divinationCount': increment(1)
-      });
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -501,9 +501,9 @@ export default function App() {
   const handleSaveLetter = async () => {
     if (!user || !replyingToDate || !letterContent.trim()) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         [`checkInLetters.${replyingToDate}`]: letterContent.trim()
-      });
+      }, { merge: true });
       setReplyingToDate(null);
       setLetterContent('');
     } catch (error) {
@@ -763,10 +763,10 @@ export default function App() {
 
       try {
         const path = `users/${user.uid}`;
-        await updateDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'users', user.uid), {
           checkInDates: arrayUnion(today),
           checkInStreak: streak
-        });
+        }, { merge: true });
         
         // Also save a check-in log for report generation
         const logRef = collection(db, 'users', user.uid, 'checkin_logs');
@@ -1315,10 +1315,10 @@ ${divinationResult.advice}
         const userRef = doc(db, 'users', user.uid);
         const categoryKey = divinationType === 'iching' ? 'profile.interests.iching' : `profile.interests.${divinationCategory}`;
         try {
-          await updateDoc(userRef, {
+          await setDoc(userRef, {
             [categoryKey]: increment(1),
             'profile.lastDivination': serverTimestamp()
-          });
+          }, { merge: true });
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, userPath);
         }
@@ -2591,7 +2591,7 @@ ${divinationResult.advice}
                                   const path = `users/${user.uid}`;
                                   const userRef = doc(db, 'users', user.uid);
                                   try {
-                                    await updateDoc(userRef, { isSubscribed: !isSubscribed });
+                                    await setDoc(userRef, { isSubscribed: !isSubscribed }, { merge: true });
                                   } catch (error) {
                                     handleFirestoreError(error, OperationType.UPDATE, path);
                                   }
