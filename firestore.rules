@@ -56,15 +56,20 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return (!('uid' in data) || data.uid == request.auth.uid) &&
-             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 100)) &&
+             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 200)) &&
              (!('gender' in data) || data.gender in ['male', 'female', 'other']) &&
              (!('birthDate' in data) || data.birthDate is string) &&
              (!('birthTime' in data) || data.birthTime is string) &&
              (!('isTrueSolarTime' in data) || data.isTrueSolarTime is bool) &&
              (!('checkInDates' in data) || data.checkInDates is list) &&
              (!('checkInLetters' in data) || data.checkInLetters is map) &&
-             (!('checkInStreak' in data) || data.checkInStreak is number) &&
-             (!('profile' in data) || data.profile is map) &&
+             (!('checkInStreak' in data) || data.checkInStreak is int || data.checkInStreak is number) &&
+             (!('profile' in data) || (
+               data.profile is map &&
+               (!('luckScore' in data.profile) || data.profile.luckScore is number) &&
+               (!('divinationCount' in data.profile) || data.profile.divinationCount is number) &&
+               (!('interests' in data.profile) || data.profile.interests is map)
+             )) &&
              (!('isSubscribed' in data) || data.isSubscribed is bool);
     }
 

@@ -12,7 +12,7 @@ import {
   Info, Heart, Star, Moon, Briefcase, Wallet, Activity, 
   Palette, Gem, Compass, Utensils, Lightbulb, MessageSquare,
   Share2, CheckCircle2, Send, Plus, Image as ImageIcon, Download, 
-  MessageCircle, HelpCircle, Trophy, Dices, Zap, Camera,
+  MessageCircle, HelpCircle, Trophy, Dices, Zap, Camera, Search,
   Volume2, VolumeX, Mic, User2, Users2, Info as InfoIcon,
   ChevronLeft, History, LayoutGrid, ArrowLeft, RefreshCw,
   AlertCircle, Gift, TrendingUp, Trash2
@@ -397,7 +397,9 @@ export default function App() {
   const [result, setResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('fortune');
   const [activeSubTab, setActiveSubTab] = useState<string>('love');
-  const [mainTab, setMainTab] = useState<MainTab>('report');
+  const [mainTab, setMainTab] = useState<MainTab>('divination');
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [showLandingForm, setShowLandingForm] = useState(false);
 
   // Community State
@@ -445,6 +447,9 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [communityView, setCommunityView] = useState<'main' | 'featured'>('main');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [recommendationSeed, setRecommendationSeed] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFeaturedCategory, setSelectedFeaturedCategory] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [reportData, setReportData] = useState<any>(null);
@@ -711,6 +716,65 @@ export default function App() {
       setDivinationQuestion(simulatedText);
       setIsListening(false);
     }, 2000);
+  };
+
+  useEffect(() => {
+    // App Initialization
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+      setIsAppReady(true);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleRefreshRecommendations = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setRecommendationSeed(prev => prev + 1);
+      setIsRefreshing(false);
+    }, 600);
+  };
+
+  const getRecommendedContent = () => {
+    const userInterests = userProfile?.interests || {};
+    const hasInterests = Object.keys(userInterests).length > 0;
+    
+    // Mix interests with defaults
+    let pool = hasInterests 
+      ? Object.entries(userInterests)
+          .sort(([, a]: any, [, b]: any) => b - b) // Keep it stable but mixable
+          .map(([catId]) => catId)
+      : DIVINATION_CATEGORIES.map(c => c.id);
+
+    // Shuffle based on seed
+    const shuffled = [...pool].sort(() => Math.sin(recommendationSeed * 7 + 0.1) - 0.5);
+    
+    const recommendations = [
+      {
+        id: 'trending_community',
+        type: 'special',
+        label: '今日热议',
+        desc: '天机灵气汇聚，看看大家都在讨论什么。',
+        action: () => setMainTab('community')
+      },
+      ...shuffled.slice(0, 3).map(id => {
+        const cat = DIVINATION_CATEGORIES.find(c => c.id === id);
+        return {
+          id,
+          type: 'category',
+          label: `${cat?.label || ''}精选`,
+          desc: id === 'love' ? '缘分天定，查看今日脱单指引。' : 
+                id === 'career' ? '财星高照，把握今日位阶升迁机。' : 
+                '慧心自明，开启今日深度悟道旅。',
+          action: () => {
+            setSelectedFeaturedCategory(id);
+            setMainTab('featured');
+          }
+        };
+      })
+    ];
+
+    return recommendations.sort(() => Math.sin(recommendationSeed * 13) - 0.5).slice(0, 2);
   };
 
   const handleLogin = async () => {
@@ -1394,8 +1458,54 @@ ${divinationResult.advice}
     setActiveSubTab('love');
   };
 
+  if (showSplash) {
+    return (
+      <div className="fixed inset-0 z-[1000] bg-guofeng-bg flex flex-col items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none guofeng-paper-texture opacity-60"></div>
+        <div className="fixed inset-0 opacity-[0.03] guofeng-fret-pattern animate-drift-slow"></div>
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="relative z-10 flex flex-col items-center"
+        >
+          <div className="w-32 h-32 bg-guofeng-red rounded-full flex items-center justify-center mb-8 shadow-2xl relative">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 border-2 border-dashed border-white/20 rounded-full"
+            />
+            <Sparkles className="text-white w-16 h-16" />
+          </div>
+          
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+            className="text-center space-y-4"
+          >
+            <h1 className="text-4xl font-serif font-black tracking-[0.5em] text-guofeng-ink pl-4">窥探天机</h1>
+            <div className="h-[1px] w-24 bg-guofeng-gold/30 mx-auto"></div>
+            <p className="text-xs font-serif text-guofeng-ink/40 tracking-[0.2em] uppercase italic">Peering into Heavenly Secrets</p>
+          </motion.div>
+        </motion.div>
+
+        <motion.div 
+          className="absolute bottom-20 left-0 w-full flex flex-col items-center space-y-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          <div className="w-1 h-12 bg-gradient-to-b from-guofeng-red to-transparent rounded-full animate-bounce"></div>
+          <p className="text-[10px] font-serif text-guofeng-red/40 tracking-widest">灵气汇聚中...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-guofeng-bg font-sans text-guofeng-ink selection:bg-red-100 relative">
+    <div className="min-h-screen bg-guofeng-bg font-sans text-guofeng-ink selection:bg-red-100 relative pb-24">
       {/* Background Patterns Layer 1: Textured Paper */}
       <div className="fixed inset-0 pointer-events-none guofeng-paper-texture opacity-40"></div>
 
@@ -2191,43 +2301,73 @@ ${divinationResult.advice}
                     className="space-y-6 pb-20"
                   >
                     {/* Personalized Recommendations */}
-                    {userProfile?.interests && Object.keys(userProfile.interests).length > 0 && (
-                      <div className="guofeng-card p-6 bg-gradient-to-br from-red-50/50 to-orange-50/50 border-red-100/50">
-                        <div className="flex items-center space-x-2 mb-4">
-                          <Star size={14} className="text-guofeng-gold" />
+                    <div className="guofeng-card p-6 bg-gradient-to-br from-red-50/50 to-orange-50/50 border-red-100/50 relative overflow-hidden group">
+                      <div className="absolute inset-0 opacity-[0.03] guofeng-fret-pattern pointer-events-none"></div>
+                      <div className="flex items-center justify-between mb-4 relative z-10">
+                        <div className="flex items-center space-x-2">
+                          <Star size={14} className="text-guofeng-gold animate-pulse" />
                           <span className="text-xs font-serif font-bold text-guofeng-ink">为您推荐</span>
                         </div>
-                        <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
-                          {Object.entries(userProfile.interests)
-                            .sort(([, a]: any, [, b]: any) => b - a)
-                            .slice(0, 2)
-                            .map(([catId]: any) => {
-                              const cat = DIVINATION_CATEGORIES.find(c => c.id === catId);
-                              if (!cat) return null;
-                              return (
-                                <div 
-                                  key={catId} 
-                                  onClick={() => {
-                                    setSelectedFeaturedCategory(catId);
-                                    setMainTab('featured');
-                                  }}
-                                  className="flex-shrink-0 w-40 p-4 bg-white rounded-2xl border border-red-100 shadow-sm space-y-2 cursor-pointer hover:border-guofeng-red transition-all group"
-                                >
-                                  <div className="text-[10px] font-serif font-bold text-guofeng-red group-hover:scale-105 transition-transform origin-left">{cat.label}精选</div>
-                                  <p className="text-[8px] text-guofeng-ink/40 font-serif leading-relaxed">
-                                    {catId === 'love' ? '点击查看今日情感疗愈指南，助您良缘早结。' : 
-                                     catId === 'career' ? '事业进阶干货：如何把握本月职场机遇？' : 
-                                     '查看更多深度指引，开启智慧人生。'}
-                                  </p>
-                                  <button className="text-[8px] font-serif font-bold text-guofeng-gold flex items-center group-hover:translate-x-1 transition-transform">
-                                    立即查看 <ChevronRight size={10} />
-                                  </button>
+                        <button 
+                          onClick={handleRefreshRecommendations}
+                          disabled={isRefreshing}
+                          className="flex items-center space-x-1 text-[10px] font-serif text-guofeng-red/60 hover:text-guofeng-red transition-colors group/btn"
+                        >
+                          <RefreshCw size={12} className={`${isRefreshing ? 'animate-spin' : 'group-hover/btn:rotate-180 transition-transform duration-500'}`} />
+                          <span>换一批</span>
+                        </button>
+                      </div>
+                      
+                      {/* Horizontal Scrollable Container */}
+                      <div className="relative z-10 -mx-6 px-6">
+                        <div className="flex space-x-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-4">
+                          <AnimatePresence mode="wait">
+                            {getRecommendedContent().map((item, idx) => (
+                              <motion.div 
+                                key={`${item.id}-${recommendationSeed}-${idx}`}
+                                initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                                animate={{ opacity: 1, scale: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, x: -20 }}
+                                transition={{ delay: idx * 0.1, duration: 0.4 }}
+                                onClick={item.action}
+                                className="flex-shrink-0 w-[260px] snap-center p-6 bg-white/90 backdrop-blur-sm rounded-2xl border border-red-100/50 shadow-[0_8px_30px_rgb(181,47,37,0.04)] space-y-3 cursor-pointer hover:border-guofeng-red transition-all group/item active:scale-95"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-7 h-7 bg-guofeng-red/5 rounded-full flex items-center justify-center">
+                                      {item.type === 'category' ? <Sparkles size={14} className="text-guofeng-red" /> : <TrendingUp size={14} className="text-guofeng-red" />}
+                                    </div>
+                                    <div className="text-xs font-serif font-black text-guofeng-red tracking-wide">{item.label}</div>
+                                  </div>
+                                  <div className="flex space-x-1">
+                                    <div className="w-1 h-1 bg-guofeng-red rounded-full opacity-10"></div>
+                                    <div className="w-1 h-1 bg-guofeng-red rounded-full opacity-20"></div>
+                                    <div className="w-1 h-1 bg-guofeng-red rounded-full opacity-30"></div>
+                                  </div>
                                 </div>
-                              );
-                            })}
+                                <p className="text-[11px] text-guofeng-ink/70 font-serif leading-relaxed h-12 overflow-hidden line-clamp-3">
+                                  {item.desc}
+                                </p>
+                                <div className="pt-3 flex items-center justify-between border-t border-guofeng-bg/80">
+                                  <div className="flex items-center space-x-1 text-[10px] font-serif font-black text-guofeng-gold group-hover/item:translate-x-1 transition-transform">
+                                    <span>深度指引</span>
+                                    <ChevronRight size={12} />
+                                  </div>
+                                  <span className="text-[9px] font-serif text-guofeng-ink/20 bg-guofeng-bg/40 px-2 py-0.5 rounded-full">#灵感</span>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                        
+                        {/* Static dots as visual indicator of scrollable area */}
+                        <div className="flex justify-center space-x-1.5 mt-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-guofeng-red/30"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-guofeng-red/10"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-guofeng-red/10"></div>
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     {/* Quick Divination Section */}
                     {user && (
@@ -3086,7 +3226,7 @@ ${divinationResult.advice}
                   >
                     <div className="flex items-center space-x-4 mb-6">
                       <button 
-                        onClick={() => setMainTab('report')}
+                        onClick={() => setMainTab('divination')}
                         className="p-2 bg-white rounded-full border border-[#EAE3D5] text-guofeng-ink/40 hover:text-guofeng-red transition-colors"
                       >
                         <ChevronLeft size={20} />
@@ -3144,6 +3284,28 @@ ${divinationResult.advice}
                   >
                     {communityView === 'main' ? (
                       <>
+                        {/* Search Bar (搜索功能) */}
+                        <div className="relative group">
+                          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                            <Search size={16} className="text-guofeng-ink/20 group-focus-within:text-guofeng-red transition-colors" />
+                          </div>
+                          <input 
+                            type="text" 
+                            placeholder="搜索社区动态、作者或关键词..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-white rounded-2xl py-3.5 pl-12 pr-4 text-xs font-serif border border-[#EAE3D5] focus:border-guofeng-red/30 outline-none transition-all shadow-sm focus:shadow-md"
+                          />
+                          {searchQuery && (
+                            <button 
+                              onClick={() => setSearchQuery('')}
+                              className="absolute inset-y-0 right-4 flex items-center text-guofeng-ink/20 hover:text-guofeng-red transition-colors"
+                            >
+                              <History size={14} className="rotate-45" />
+                            </button>
+                          )}
+                        </div>
+
                         {/* Topics Grid (纵向排列) */}
                         <div className="space-y-4">
                           <div className="flex items-center space-x-2 px-1">
@@ -3307,10 +3469,39 @@ ${divinationResult.advice}
                     </div>
 
                     <div className="space-y-6">
-                      {posts
-                        .filter(post => !activeTopic || post.content.includes(activeTopic))
-                        .map((post) => (
-                        <div key={post.id} className="guofeng-card p-8">
+                      {(() => {
+                        const filteredPosts = posts.filter(post => {
+                          const matchesTopic = !activeTopic || post.content.includes(activeTopic);
+                          const matchesSearch = !searchQuery || 
+                            post.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            post.author.toLowerCase().includes(searchQuery.toLowerCase());
+                          return matchesTopic && matchesSearch;
+                        });
+
+                        if (filteredPosts.length === 0) {
+                          return (
+                            <div className="guofeng-card p-12 text-center space-y-4">
+                              <div className="w-16 h-16 bg-guofeng-bg rounded-full flex items-center justify-center mx-auto border border-[#EAE3D5]">
+                                <Search size={24} className="text-guofeng-ink/10" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-sm font-serif font-black text-guofeng-ink">未找到相关动态</p>
+                                <p className="text-[10px] text-guofeng-ink/40 font-serif">尝试换个关键词或者选择其他话题吧</p>
+                              </div>
+                              {searchQuery && (
+                                <button 
+                                  onClick={() => setSearchQuery('')}
+                                  className="text-xs font-serif font-bold text-guofeng-red hover:underline"
+                                >
+                                  清除搜索条件
+                                </button>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return filteredPosts.map((post) => (
+                          <div key={post.id} className="guofeng-card p-8">
                           <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center space-x-4">
                               <div className="w-10 h-10 bg-[#FDFBF7] rounded-full flex items-center justify-center text-guofeng-ink/40 font-serif font-bold border border-[#EAE3D5]">
@@ -3468,7 +3659,7 @@ ${divinationResult.advice}
                             )}
                           </AnimatePresence>
                         </div>
-                      ))}
+                      ))})()}
                     </div>
                   </>
                 ) : (
